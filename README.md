@@ -1,10 +1,6 @@
 # 🎧 DupClean — Duplicate File Cleaner
 
-<<<<<<< HEAD
-A fast, content-aware duplicate file scanner for music producers and DJs, and other creators with continously growing storage.
-=======
 A fast, content-aware duplicate file scanner for music producers, DJs, and anyone with a messy hard drive.
->>>>>>> merger
 
 **The key insight:** Two files can have completely different names but identical content.  
 DupClean hashes file *contents* — not names — so it catches every duplicate no matter how it was renamed.
