@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -41,26 +42,13 @@ type AppState struct {
 	CurrentGroupIndex int
 	DeletedCount      int
 	FreedBytes        int64
+	Stats             scanner.ScanStats
 }
 
 func RunGUI() {
 	log.Println("RunGUI: starting...")
 
-	fyneApp := fyne.CurrentApp()
-	log.Printf("RunGUI: current app = %v", fyneApp)
-
-	if fyneApp == nil {
-		log.Println("RunGUI: creating new app...")
-		fyneApp = app.New()
-	}
-
-	log.Printf("RunGUI: app after check = %v", fyneApp)
-
-	if fyneApp == nil {
-		fmt.Println("Error: No display available. Running in CLI mode instead.")
-		fmt.Println("Usage: dupclean <folder> [--all]")
-		os.Exit(1)
-	}
+	fyneApp := app.New()
 
 	log.Println("RunGUI: setting icon...")
 	fyneApp.SetIcon(theme.FolderOpenIcon())
@@ -183,12 +171,12 @@ func startScan(state *AppState, folderEntry *widget.Entry, progressBar *widget.P
 }
 
 func showResults(state *AppState, stats scanner.ScanStats) {
+	state.Stats = stats
 	if len(state.Groups) == 0 {
-		state.Window.SetContent(createNoDuplicatesUI(state, stats))
+		state.Window.SetContent(createNoDuplicatesUI(state, state.Stats))
 		return
 	}
-
-	state.Window.SetContent(createResultsUI(state, stats))
+	state.Window.SetContent(createResultsUI(state, state.Stats))
 }
 
 func createNoDuplicatesUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject {
@@ -242,8 +230,11 @@ func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject
 		groupsContainer.Objects = nil
 
 		if state.CurrentGroupIndex >= len(state.Groups) {
-			state.Window.SetContent(createFinalUI(state))
-			return
+			if len(state.Groups) == 0 {
+				state.Window.SetContent(createFinalUI(state))
+				return
+			}
+			state.CurrentGroupIndex = len(state.Groups) - 1
 		}
 
 		group := state.Groups[state.CurrentGroupIndex]
@@ -276,7 +267,7 @@ func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject
 		btnRow := container.NewHBox(
 			widget.NewButton("Skip Group", func() {
 				state.CurrentGroupIndex++
-				state.Window.SetContent(createResultsUI(state, stats))
+				state.Window.SetContent(createResultsUI(state, state.Stats))
 			}),
 			widget.NewButton("Skip All", func() {
 				state.Window.SetContent(createFinalUI(state))
@@ -286,8 +277,11 @@ func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject
 		if len(files) > 0 {
 			keepBtn := widget.NewButton("Keep #1 & Delete Others", func() {
 				keepAndDelete(state, 0, files)
-				state.CurrentGroupIndex++
-				state.Window.SetContent(createResultsUI(state, stats))
+				if len(state.Groups) == 0 {
+					state.Window.SetContent(createFinalUI(state))
+				} else {
+					state.Window.SetContent(createResultsUI(state, state.Stats))
+				}
 			})
 			btnRow.AddObject(keepBtn)
 		}
@@ -336,7 +330,7 @@ func createFileRow(num int, f scanner.FileInfo, state *AppState, stats scanner.S
 					}
 				}
 
-				state.Window.SetContent(createResultsUI(state, scanner.ScanStats{}))
+				state.Window.SetContent(createResultsUI(state, state.Stats))
 			}
 		}, state.Window)
 	})
@@ -354,6 +348,9 @@ func keepAndDelete(state *AppState, keepIndex int, files []scanner.FileInfo) {
 		state.DeletedCount++
 		state.FreedBytes += f.Size
 	}
+
+	i := state.CurrentGroupIndex
+	state.Groups = append(state.Groups[:i], state.Groups[i+1:]...)
 }
 
 func createFinalUI(state *AppState) fyne.CanvasObject {
@@ -434,7 +431,7 @@ func moveToTrash(path string) error {
 }
 
 func runtimeOS() string {
-	return strings.ToLower(os.Getenv("GOOS"))
+	return runtime.GOOS
 }
 
 func formatBytes(b int64) string {
