@@ -69,11 +69,11 @@ func createMainUI(state *AppState) fyne.CanvasObject {
 	folderEntry := widget.NewEntryWithData(state.FolderPath)
 	folderEntry.Disable()
 	browseBtn := widget.NewButton("Browse...", func() {
-		dialog.ShowFolderOpen(func(dir fyne.ListableItem, err error) {
+		dialog.ShowFolderOpen(func(dir fyne.ListableURI, err error) {
 			if err != nil || dir == nil {
 				return
 			}
-			state.FolderPath.Set(dir.Name())
+			state.FolderPath.Set(dir.Path())
 		}, state.Window)
 	})
 
@@ -238,15 +238,20 @@ func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject
 			return files[i].ModTime.Before(files[j].ModTime)
 		})
 
+		currentIndex := state.CurrentGroupIndex
+
 		for idx, f := range files {
-			row := createFileRow(idx+1, f, state)
+			row := createFileRow(idx+1, f, state, func() {
+				state.CurrentGroupIndex = currentIndex + 1
+				state.Window.SetContent(createResultsUI(state, stats))
+			})
 			groupsContainer.AddObject(row)
 		}
 
 		btnRow := container.NewHBox(
 			widget.NewButton("Skip Group", func() {
 				state.CurrentGroupIndex++
-				updateGroupDisplay()
+				state.Window.SetContent(createResultsUI(state, stats))
 			}),
 			widget.NewButton("Skip All", func() {
 				state.Window.SetContent(createFinalUI(state))
@@ -254,10 +259,10 @@ func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject
 		)
 
 		if len(files) > 0 {
-			keepBtn := widget.NewButton(fmt.Sprintf("Keep #1 & Delete Others", len(files)), func() {
+			keepBtn := widget.NewButton("Keep #1 & Delete Others", func() {
 				keepAndDelete(state, 0, files)
 				state.CurrentGroupIndex++
-				updateGroupDisplay()
+				state.Window.SetContent(createResultsUI(state, stats))
 			})
 			btnRow.AddObject(keepBtn)
 		}
@@ -278,13 +283,11 @@ func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject
 	)
 }
 
-func createFileRow(num int, f scanner.FileInfo, state *AppState) fyne.CanvasObject {
-	card := widget.NewCard()
-	card.SetContent(container.NewVBox(
-		widget.NewLabel(fmt.Sprintf("[%d] %s", num, f.Name)),
-		widget.NewLabel(f.Path),
-		widget.NewLabel(fmt.Sprintf("Size: %s | Modified: %s", formatBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"))),
-	))
+func createFileRow(num int, f scanner.FileInfo, state *AppState, onDelete func()) fyne.CanvasObject {
+	card := widget.NewCard(fmt.Sprintf("[%d] %s", num, f.Name), f.Path,
+		container.NewVBox(
+			widget.NewLabel(fmt.Sprintf("Size: %s | Modified: %s", formatBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"))),
+		))
 
 	deleteBtn := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 		dialog.ShowConfirm("Delete File?", fmt.Sprintf("Move '%s' to Trash?", f.Name), func(ok bool) {
