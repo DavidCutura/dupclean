@@ -25,7 +25,7 @@ jobs:
             path: dist/
 
   build-mac-amd64:
-    runs-on: macos-13  # macos-13 is the last Intel runner on GitHub Actions
+    runs-on: macos-15-intel  # macos-13 is the last Intel runner on GitHub Actions
     steps:
         - uses: actions/checkout@v4
         - uses: actions/setup-go@v5
