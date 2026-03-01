@@ -1,3 +1,6 @@
+permissions: 
+    contents: write
+
 name: Build & Release
 
 on:
@@ -75,12 +78,17 @@ jobs:
   release:
     needs: [build-mac-arm64, build-mac-amd64, build-linux, build-windows]
     runs-on: ubuntu-latest
+    permissions:
+        contents: write
     steps:
       - uses: actions/download-artifact@v4
+        with:
+            path: artifacts/
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            mac-binaries/*
-            linux-binary/*
-            windows-binary/*
+            artifacts/mac-arm64/*
+            artifacts/mac-amd64/*
+            artifacts/linux-binary/*
+            artifacts/windows-binary/*
