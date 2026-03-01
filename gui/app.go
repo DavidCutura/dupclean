@@ -296,6 +296,10 @@ func createFileRow(num int, f scanner.FileInfo, state *AppState, onDelete func()
 				state.DeletedCount++
 				state.FreedBytes += f.Size
 
+				if onDelete != nil {
+					onDelete()
+				}
+
 				for i, g := range state.Groups {
 					if g.Hash == f.Hash {
 						for j, file := range g.Files {
