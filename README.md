@@ -1,9 +1,24 @@
 # 🎧 DupClean — Duplicate File Cleaner
 
+<<<<<<< HEAD
 A fast, content-aware duplicate file scanner for music producers and DJs, and other creators with continously growing storage.
+=======
+A fast, content-aware duplicate file scanner for music producers, DJs, and anyone with a messy hard drive.
+>>>>>>> merger
 
-**The key insight:** Two files can have completely different names but identical audio content.  
+**The key insight:** Two files can have completely different names but identical content.  
 DupClean hashes file *contents* — not names — so it catches every duplicate no matter how it was renamed.
+
+---
+
+## Features
+
+- **Content-aware scanning** — finds duplicates by file hash, not filename
+- **Audio preview** — listen to files before deciding which to keep
+- **Ignore rules** — exclude specific folders or file extensions per scan
+- **Safe deletion** — files are moved to Trash, never permanently deleted
+- **Cross-platform** — macOS, Windows, and Linux
+- **GUI + CLI** — graphical interface for everyday use, terminal mode for power users
 
 ---
 
@@ -12,62 +27,63 @@ DupClean hashes file *contents* — not names — so it catches every duplicate 
 ### macOS
 
 **Option 1: DMG (Recommended)**
-1. Download `dupclean.dmg` from releases
+1. Download `dupclean.dmg` from [Releases](https://github.com/PopolQue/dupclean/releases)
 2. Double-click to mount
 3. Drag `DupClean.app` to Applications
-4. Run from Terminal: `dupclean` (adds to PATH automatically on first run)
 
-**Option 2: Homebrew**
+**Option 2: Binary**
 ```bash
-# Coming soon - submit a PR if you'd like to add it!
+tar -xzf dupclean-darwin-arm64.tar.gz
+sudo mv dupclean /usr/local/bin/
 ```
 
-**Option 3: Binary**
+**Option 3: Homebrew**
 ```bash
-# Download and extract
-tar -xzf dupclean-darwin-arm64.tar.gz
-./dupclean
-
-# Or copy to PATH
-sudo mv dupclean /usr/local/bin/
+# Coming soon
 ```
 
 ---
 
 ### Linux
 
-**Binary**
 ```bash
-# Download and extract
-tar -xzf dupclean-linux-arm64.tar.gz
-
-# Run directly
-./dupclean
-
-# Or copy to PATH
+tar -xzf dupclean-linux-amd64.tar.gz
 sudo mv dupclean /usr/local/bin/
 ```
 
 **Required dependencies:**
 - GTK (usually pre-installed on most distros)
+- `aplay` for audio preview (part of `alsa-utils`)
 - On headless servers: X11 forwarding or a desktop environment
 
 ---
 
 ### Windows
 
-**Binary**
-```bash
-# Download and extract the zip
-# Run directly
-dupclean.exe
-```
-
-Or double-click in File Explorer.
+Download and extract the `.zip` from [Releases](https://github.com/PopolQue/dupclean/releases), then run `dupclean.exe` directly or double-click in File Explorer.
 
 ---
 
 ## Usage
+
+### GUI Mode
+
+Launch without arguments to open the graphical interface:
+
+```bash
+dupclean
+# or explicitly
+dupclean --gui
+```
+
+**Workflow:**
+1. Select a folder to scan
+2. Optionally check "Scan all file types" (default: audio only)
+3. Click **Start Scan** — an ignore rules dialog appears before scanning begins
+4. Review duplicate groups — preview files with ▶, delete with 🗑, or use **Keep #1 & Delete Others**
+5. When done, a summary shows how many files were trashed and how much space was freed
+
+---
 
 ### CLI Mode
 
@@ -75,13 +91,14 @@ Or double-click in File Explorer.
 # Scan a folder for duplicate audio files
 dupclean ~/Music/Samples
 
-# Also include non-audio files
+# Also scan non-audio files
 dupclean ~/Music/Samples --all
 
 # Show help
 dupclean --help
 ```
 
+<<<<<<< HEAD
 ### GUI Mode (macOS/Windows/Linux with display)
 
 ```bash
@@ -133,117 +150,111 @@ Then choose which copy to **keep** (others go to Trash), or **skip** the group.
 ```
 
 ### Controls
+=======
+**Controls:**
+>>>>>>> merger
 
 | Input | Action |
 |-------|--------|
 | `1`, `2`, ... | Keep that file, trash the rest |
-| `s` or Enter  | Skip this group (keep all) |
+| `s` or Enter  | Skip this group |
 | `a`           | Skip all remaining groups |
 | `q`           | Quit |
 
 ---
 
-## Supported formats
+## How It Works
 
-Audio: `.wav` `.aiff` `.aif` `.mp3` `.flac` `.ogg` `.m4a` `.aac` `.opus` `.wma`
+1. **Walks** the folder recursively, skipping hidden files and ignored paths
+2. **Pre-filters** by file size — only same-size files can be duplicates
+3. **SHA-256 hashes** the content of candidates (skips unique-size files entirely for speed)
+4. **Groups** files with matching hashes and presents them for review
+5. **Moves** chosen files to Trash — nothing is permanently deleted
 
-Use `--all` to scan every file type regardless of extension.
+---
+
+## Ignore Rules
+
+Before each scan, a dialog lets you configure rules for that session:
+
+- **Folders to ignore** — use the folder picker to exclude specific directories (e.g. a backup folder you want to keep duplicates in)
+- **Extensions to ignore** — comma-separated list (e.g. `.txt, .pdf`) to skip certain file types
+
+Ignore rules reset after each scan and are not saved between sessions.
+
+---
+
+## Audio Preview
+
+Click the ▶ button on any file in a duplicate group to preview it. Starting a new preview automatically stops the previous one. Trashing a file also stops playback if that file is currently playing.
+
+**Preview uses native OS audio playback:**
+- macOS: `afplay` (built-in)
+- Linux: `aplay` (install via `sudo apt install alsa-utils`)
+- Windows: PowerShell `Media.SoundPlayer`
+
+---
+
+## Supported Audio Formats
+
+`.wav` `.aiff` `.aif` `.mp3` `.flac` `.ogg` `.m4a` `.aac` `.opus` `.wma`
+
+Use `--all` in CLI mode or check "Scan all file types" in the GUI to scan every file type regardless of extension.
 
 ---
 
 ## Safety
 
-- Files are moved to **Trash/Recycle Bin**, not permanently deleted
-- You can restore anything before emptying the Trash
+- Files are moved to **Trash / Recycle Bin**, never permanently deleted
+- Restore anything from Trash before emptying it
 - Hidden files and `.DS_Store` are automatically ignored
-
-**macOS:** Uses built-in `osascript`  
-**Linux:** Uses `gio trash` or moves to `~/.local/share/Trash/`  
-**Windows:** Uses recycle bin via Go standard library
 
 ---
 
 ## Building from Source
 
 ```bash
-# Clone and build
-git clone https://github.com/yourusername/dupclean.git
+git clone https://github.com/PopolQue/dupclean.git
 cd dupclean
 go build -o dupclean .
-
-# Run
-./dupclean ~/Music
-
-# Install to PATH
-sudo mv dupclean /usr/local/bin/
+./dupclean
 ```
 
 ### Cross-compilation
 
 ```bash
-# macOS
-make cross-darwin-local
+make cross-darwin-local   # macOS
+make cross-linux          # Linux
+make cross-windows        # Windows
+make release              # All platforms
+```
 
-# Linux  
-make cross-linux
+---
 
-# Windows
-make cross-windows
+## Project Structure
 
-# All platforms
-make release
+```
+dupclean/
+├── main.go              # Entry point, CLI arg handling
+├── gui/
+│   └── app.go           # GUI implementation (Fyne)
+├── scanner/
+│   └── scanner.go       # Content hashing & duplicate detection
+├── ui/
+│   └── ui.go            # Interactive terminal UI
+└── Makefile             # Build commands
 ```
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Here's how to help:
-
-### Reporting Issues
+Contributions are welcome.
 
 - Found a bug? [Open an issue](https://github.com/PopolQue/dupclean/issues)
-- Include steps to reproduce, expected vs actual behavior
-- Include your OS, Go version, and relevant details
-
-### Submitting Changes
-
-1. **Fork** the repository
-2. **Create** a feature branch: `git checkout -b my-feature`
-3. **Make** your changes
-4. **Test** with `go test ./...`
-5. **Commit** with clear messages: `git commit -m "Add feature X"`
-6. **Push** and submit a PR
-
-### Code Style
-
-- Run `go fmt` before committing
-- Keep functions small and focused
-- Add tests for new functionality
-- Update documentation for user-facing changes
-
-### Testing
-
-```bash
-# Run all tests
-go test ./...
-
-# Run with coverage
-go test -cover ./...
-```
-
-### Project Structure
-
-```
-dupclean/
-├── main.go          # Entry point
-├── gui/app.go       # GUI implementation (Fyne)
-├── scanner/         # Core duplicate detection
-│   └── scanner.go   # Hashing & file scanning
-├── ui/              # Terminal UI
-│   └── ui.go       # Interactive CLI prompts
-└── Makefile        # Build commands
-```
+- Want to add a feature? Fork, branch, and submit a PR
+- Run `go fmt ./...` before committing
+- Run `go test ./...` to verify nothing is broken
 
 ---
 

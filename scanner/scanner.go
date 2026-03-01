@@ -47,7 +47,7 @@ type ScanStats struct {
 }
 
 // FindDuplicates scans a folder and returns groups of duplicate files
-func FindDuplicates(folder string, includeAll bool, onProgress func(int)) ([]DuplicateGroup, ScanStats, error) {
+func FindDuplicates(folder string, includeAll bool, onProgress func(int), ignoreFolders []string, ignoreExtensions []string) ([]DuplicateGroup, ScanStats, error) {
 	start := time.Now()
 	stats := ScanStats{}
 
@@ -69,7 +69,27 @@ func FindDuplicates(folder string, includeAll bool, onProgress func(int)) ([]Dup
 			return nil // skip hidden files
 		}
 
+		if info.IsDir() {
+			if strings.HasPrefix(info.Name(), ".") {
+				return filepath.SkipDir
+			}
+
+			// Check ignored folders
+			for _, ignored := range ignoreFolders {
+				if path == ignored || strings.HasPrefix(path, ignored+string(filepath.Separator)) {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+
+		// Check ignored extensions
 		ext := strings.ToLower(filepath.Ext(info.Name()))
+		for _, ignoredExt := range ignoreExtensions {
+			if ext == ignoredExt {
+				return nil
+			}
+		}
 		if !includeAll && !audioExtensions[ext] {
 			return nil
 		}

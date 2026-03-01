@@ -43,6 +43,10 @@ type AppState struct {
 	DeletedCount      int
 	FreedBytes        int64
 	Stats             scanner.ScanStats
+	CurrentPlayer     *exec.Cmd
+	StopPlayer        func()
+	IgnoreFolders     []string
+	IgnoreExtensions  []string
 }
 
 func RunGUI() {
@@ -116,7 +120,9 @@ func createMainUI(state *AppState) fyne.CanvasObject {
 			dialog.ShowError(fmt.Errorf("invalid folder"), state.Window)
 			return
 		}
-		startScan(state, folderEntry, progressBar, progressLabel)
+		showIgnoreDialog(state, func() {
+			startScan(state, folderEntry, progressBar, progressLabel)
+		})
 	})
 	scanBtn.Disable()
 
@@ -152,7 +158,7 @@ func startScan(state *AppState, folderEntry *widget.Entry, progressBar *widget.P
 	progressBar.SetValue(0)
 
 	go func() {
-		groups, stats, err := scanner.FindDuplicates(state.FolderPath, state.ScanAll, nil)
+		groups, stats, err := scanner.FindDuplicates(state.FolderPath, state.ScanAll, func(n int) { progressLabel.SetText(fmt.Sprintf("Hashing... %d files", n)) }, state.IgnoreFolders, state.IgnoreExtensions)
 		if err != nil {
 			state.IsScanning = false
 			progressLabel.SetText(fmt.Sprintf("Error: %v", err))
@@ -308,9 +314,19 @@ func createFileRow(num int, f scanner.FileInfo, state *AppState, stats scanner.S
 			widget.NewLabel(fmt.Sprintf("Size: %s | Modified: %s", formatBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"))),
 		))
 
+	playBtn := widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
+		playFile(state, f.Path)
+	})
+
 	deleteBtn := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 		dialog.ShowConfirm("Delete File?", fmt.Sprintf("Move '%s' to Trash?", f.Name), func(ok bool) {
 			if ok {
+
+				if state.CurrentPlayer != nil {
+					stopPlayback(state)
+					state.CurrentPlayer = nil
+				}
+
 				moveToTrash(f.Path)
 				state.DeletedCount++
 				state.FreedBytes += f.Size
@@ -335,11 +351,12 @@ func createFileRow(num int, f scanner.FileInfo, state *AppState, stats scanner.S
 		}, state.Window)
 	})
 	deleteBtn.Importance = widget.DangerImportance
-
-	return container.NewBorder(nil, nil, card, deleteBtn)
+	buttons := container.NewHBox(playBtn, deleteBtn)
+	return container.NewBorder(nil, nil, card, buttons)
 }
 
 func keepAndDelete(state *AppState, keepIndex int, files []scanner.FileInfo) {
+	stopPlayback(state)
 	for idx, f := range files {
 		if idx == keepIndex {
 			continue
@@ -445,4 +462,120 @@ func formatBytes(b int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+func playFile(state *AppState, path string) {
+	// Always stop whatever is playing first
+	if state.StopPlayer != nil {
+		state.StopPlayer()
+		state.StopPlayer = nil
+		state.CurrentPlayer = nil
+	}
+
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("afplay", path)
+	case "linux":
+		cmd = exec.Command("aplay", path)
+	case "windows":
+		cmd = exec.Command("powershell", "-c",
+			fmt.Sprintf("(New-Object Media.SoundPlayer '%s').PlaySync()", path))
+	default:
+		return
+	}
+
+	state.CurrentPlayer = cmd
+	state.StopPlayer = func() {
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+		}
+	}
+
+	go func() {
+		cmd.Run()
+		// Only clear if this is still the active player
+		if state.CurrentPlayer == cmd {
+			state.CurrentPlayer = nil
+			state.StopPlayer = nil
+		}
+	}()
+}
+
+func showIgnoreDialog(state *AppState, onConfirm func()) {
+	ignoredFolders := []string{}
+
+	var folderList *widget.List
+
+	// List widget to display chosen folders
+	folderList = widget.NewList(
+		func() int { return len(ignoredFolders) },
+		func() fyne.CanvasObject {
+			return container.NewBorder(nil, nil, nil,
+				widget.NewButtonWithIcon("", theme.DeleteIcon(), nil),
+				widget.NewLabel(""),
+			)
+		},
+		func(i widget.ListItemID, obj fyne.CanvasObject) {
+			border := obj.(*fyne.Container)
+			label := border.Objects[0].(*widget.Label)
+			btn := border.Objects[1].(*widget.Button)
+			label.SetText(ignoredFolders[i])
+			btn.OnTapped = func() {
+				ignoredFolders = append(ignoredFolders[:i], ignoredFolders[i+1:]...)
+				folderList.Refresh()
+			}
+		},
+	)
+	scrolledList := container.NewScroll(folderList)
+	scrolledList.SetMinSize(fyne.NewSize(500, 150))
+
+	addFolderBtn := widget.NewButtonWithIcon("Add Folder", theme.FolderOpenIcon(), func() {
+		dialog.ShowFolderOpen(func(dir fyne.ListableURI, err error) {
+			if err != nil || dir == nil {
+				return
+			}
+			ignoredFolders = append(ignoredFolders, dir.Path())
+			folderList.Refresh()
+		}, state.Window)
+	})
+
+	extensionsEntry := widget.NewEntry()
+	extensionsEntry.SetPlaceHolder("e.g. .txt, .pdf, .jpg")
+
+	content := container.NewVBox(
+		widget.NewLabel("Folders to ignore:"),
+		scrolledList,
+		addFolderBtn,
+		widget.NewSeparator(),
+		widget.NewLabel("Extensions to ignore (comma-separated):"),
+		extensionsEntry,
+	)
+
+	dialog.ShowCustomConfirm("Ignore Rules", "Start Scan", "Cancel", content, func(ok bool) {
+		if !ok {
+			return
+		}
+		state.IgnoreFolders = ignoredFolders
+
+		state.IgnoreExtensions = []string{}
+		for _, ext := range strings.Split(extensionsEntry.Text, ",") {
+			ext = strings.TrimSpace(ext)
+			if ext != "" {
+				if !strings.HasPrefix(ext, ".") {
+					ext = "." + ext
+				}
+				state.IgnoreExtensions = append(state.IgnoreExtensions, strings.ToLower(ext))
+			}
+		}
+		onConfirm()
+	}, state.Window)
+}
+
+func stopPlayback(state *AppState) {
+	if state.StopPlayer != nil {
+		state.StopPlayer()
+		state.StopPlayer = nil
+		state.CurrentPlayer = nil
+	}
 }

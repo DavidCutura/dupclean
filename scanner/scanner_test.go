@@ -106,7 +106,7 @@ func TestScanStatsStruct(t *testing.T) {
 func TestFindDuplicates_EmptyFolder(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	groups, stats, err := FindDuplicates(tmpDir, false)
+	groups, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -125,7 +125,7 @@ func TestFindDuplicates_NoAudioFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("hello"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file.pdf"), []byte("world"), 0644)
 
-	groups, stats, err := FindDuplicates(tmpDir, false)
+	groups, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -144,7 +144,7 @@ func TestFindDuplicates_ScanAllFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("hello"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file.pdf"), []byte("world"), 0644)
 
-	groups, stats, err := FindDuplicates(tmpDir, true)
+	groups, stats, err := FindDuplicates(tmpDir, true, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -164,7 +164,7 @@ func TestFindDuplicates_NoDuplicates(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file2.wav"), []byte("content2"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file3.wav"), []byte("content3"), 0644)
 
-	groups, stats, err := FindDuplicates(tmpDir, false)
+	groups, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -188,7 +188,7 @@ func TestFindDuplicates_WithDuplicates(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file3.wav"), content2, 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file4.wav"), content2, 0644)
 
-	groups, stats, err := FindDuplicates(tmpDir, false)
+	groups, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -222,7 +222,7 @@ func TestFindDuplicates_ThreeWayDuplicate(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file2.wav"), content, 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file3.wav"), content, 0644)
 
-	groups, stats, err := FindDuplicates(tmpDir, false)
+	groups, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -246,7 +246,7 @@ func TestFindDuplicates_PreservesOriginal(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "original.wav"), content, 0644)
 	os.WriteFile(filepath.Join(tmpDir, "duplicate.wav"), content, 0644)
 
-	groups, _, err := FindDuplicates(tmpDir, false)
+	groups, _, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -275,7 +275,7 @@ func TestFindDuplicates_SkipsHiddenFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, ".hidden.wav"), []byte("hidden"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "visible.wav"), []byte("visible"), 0644)
 
-	_, stats, err := FindDuplicates(tmpDir, false)
+	_, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -292,7 +292,7 @@ func TestFindDuplicates_SkipsHiddenDirectories(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, ".hidden", "file.wav"), []byte("hidden dir"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "visible.wav"), []byte("visible"), 0644)
 
-	_, stats, err := FindDuplicates(tmpDir, false)
+	_, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -316,7 +316,7 @@ func TestFindDuplicates_NestedDirectories(t *testing.T) {
 	os.WriteFile(filepath.Join(subDir1, "file2.wav"), content, 0644)
 	os.WriteFile(filepath.Join(subDir2, "file3.wav"), content, 0644)
 
-	groups, stats, err := FindDuplicates(tmpDir, false)
+	groups, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -339,7 +339,7 @@ func TestFindDuplicates_DifferentSizesNoDuplicates(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "medium.wav"), []byte("ab"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "large.wav"), []byte("abc"), 0644)
 
-	groups, stats, err := FindDuplicates(tmpDir, false)
+	groups, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -365,7 +365,7 @@ func TestFindDuplicates_WastedBytesCalculation(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file2.wav"), content, 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file3.wav"), content, 0644)
 
-	_, stats, err := FindDuplicates(tmpDir, false)
+	_, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -457,7 +457,7 @@ func TestHashFile_NonExistentFile(t *testing.T) {
 }
 
 func TestFindDuplicates_InvalidPath(t *testing.T) {
-	groups, stats, err := FindDuplicates("/nonexistent/path/to/folder", false)
+	groups, stats, err := FindDuplicates("/nonexistent/path/to/folder", false, nil, []string{}, []string{})
 	if err != nil {
 		t.Logf("FindDuplicates returned error for invalid path: %v", err)
 	}
@@ -478,7 +478,7 @@ func TestFindDuplicates_CaseInsensitiveExtension(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file2.wav"), content, 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file3.Wav"), content, 0644)
 
-	groups, _, err := FindDuplicates(tmpDir, false)
+	groups, _, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -502,7 +502,7 @@ func TestFindDuplicates_MixedAudioAndNonAudio(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file3.txt"), nonAudioContent, 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file4.txt"), nonAudioContent, 0644)
 
-	groups, stats, err := FindDuplicates(tmpDir, false)
+	groups, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -526,7 +526,7 @@ func TestFindDuplicates_ScanAllMixedFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file3.txt"), txtContent, 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file4.txt"), txtContent, 0644)
 
-	groups, stats, err := FindDuplicates(tmpDir, true)
+	groups, stats, err := FindDuplicates(tmpDir, true, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -548,7 +548,7 @@ func TestFindDuplicates_FileInfoPopulated(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "file1.wav"), content, 0644)
 	os.WriteFile(filepath.Join(tmpDir, "file2.wav"), content, 0644)
 
-	groups, _, err := FindDuplicates(tmpDir, false)
+	groups, _, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
@@ -576,7 +576,7 @@ func TestFindDuplicates_ScanDurationRecorded(t *testing.T) {
 
 	os.WriteFile(filepath.Join(tmpDir, "file1.wav"), []byte("content1"), 0644)
 
-	_, stats, err := FindDuplicates(tmpDir, false)
+	_, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
 	if err != nil {
 		t.Fatalf("FindDuplicates() error = %v", err)
 	}
