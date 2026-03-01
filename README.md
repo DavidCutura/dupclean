@@ -94,7 +94,6 @@ dupclean ~/Music/Samples --all
 dupclean --help
 ```
 
-<<<<<<< HEAD
 ### GUI Mode (macOS/Windows/Linux with display)
 
 ```bash
@@ -148,7 +147,6 @@ Then choose which copy to **keep** (others go to Trash), or **skip** the group.
 ### Controls
 =======
 **Controls:**
->>>>>>> merger
 
 | Input | Action |
 |-------|--------|
