@@ -2,33 +2,41 @@ package gui
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"dupclean/scanner"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
+func init() {
+	logFile, err := os.OpenFile("/tmp/dupclean.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		log.SetOutput(logFile)
+	}
+	log.Println("DupClean starting...")
+}
+
 type AppState struct {
 	Window            fyne.Window
-	FolderPath        binding.String
-	ScanAll           binding.Bool
-	IsScanning        binding.Bool
-	ProgressText      binding.String
-	ProgressValue     binding.Float
+	FolderPath        string
+	ScanAll           bool
+	IsScanning        bool
+	ProgressText      string
+	ProgressValue     float64
 	Groups            []scanner.DuplicateGroup
 	CurrentGroupIndex int
 	DeletedCount      int
@@ -36,28 +44,51 @@ type AppState struct {
 }
 
 func RunGUI() {
-	app := fyne.CurrentApp()
-	app.SetIcon(theme.FolderOpenIcon())
+	log.Println("RunGUI: starting...")
 
-	w := app.NewWindow("DupClean - Audio Duplicate Finder")
+	fyneApp := fyne.CurrentApp()
+	log.Printf("RunGUI: current app = %v", fyneApp)
+
+	if fyneApp == nil {
+		log.Println("RunGUI: creating new app...")
+		fyneApp = app.New()
+	}
+
+	log.Printf("RunGUI: app after check = %v", fyneApp)
+
+	if fyneApp == nil {
+		fmt.Println("Error: No display available. Running in CLI mode instead.")
+		fmt.Println("Usage: dupclean <folder> [--all]")
+		os.Exit(1)
+	}
+
+	log.Println("RunGUI: setting icon...")
+	fyneApp.SetIcon(theme.FolderOpenIcon())
+
+	log.Println("RunGUI: creating window...")
+	w := fyneApp.NewWindow("DupClean - Audio Duplicate Finder")
 	w.Resize(fyne.NewSize(800, 600))
 	w.SetFixedSize(true)
 
+	log.Println("RunGUI: creating state...")
 	state := &AppState{
-		Window:        w,
-		FolderPath:    binding.NewString(),
-		ScanAll:       binding.NewBool(),
-		IsScanning:    binding.NewBool(),
-		ProgressText:  binding.NewString(),
-		ProgressValue: binding.NewFloat(),
+		Window:            w,
+		FolderPath:        "",
+		ScanAll:           false,
+		IsScanning:        false,
+		ProgressText:      "Ready",
+		ProgressValue:     0,
+		Groups:            nil,
+		CurrentGroupIndex: 0,
+		DeletedCount:      0,
+		FreedBytes:        0,
 	}
-
-	state.FolderPath.Set("")
-	state.ProgressText.Set("Ready")
 
 	w.SetContent(createMainUI(state))
 
-	w.Show()
+	log.Println("RunGUI: showing window...")
+	w.ShowAndRun()
+	log.Println("RunGUI: window closed")
 }
 
 func createMainUI(state *AppState) fyne.CanvasObject {
@@ -66,36 +97,49 @@ func createMainUI(state *AppState) fyne.CanvasObject {
 	title.Alignment = fyne.TextAlignCenter
 
 	folderLabel := widget.NewLabel("Select folder to scan:")
-	folderEntry := widget.NewEntryWithData(state.FolderPath)
+	folderEntry := widget.NewEntry()
 	folderEntry.Disable()
 	browseBtn := widget.NewButton("Browse...", func() {
 		dialog.ShowFolderOpen(func(dir fyne.ListableURI, err error) {
 			if err != nil || dir == nil {
 				return
 			}
-			state.FolderPath.Set(dir.Path())
+			folderEntry.SetText(dir.Path())
+			state.FolderPath = dir.Path()
 		}, state.Window)
 	})
 
 	folderRow := container.NewBorder(nil, nil, folderLabel, browseBtn, folderEntry)
 
-	scanAllCheck := widget.NewCheckWithData("Scan all file types (not just audio)", state.ScanAll)
+	scanAllCheck := widget.NewCheck("Scan all file types (not just audio)", func(checked bool) {
+		state.ScanAll = checked
+	})
+
+	progressBar := widget.NewProgressBar()
+	progressLabel := widget.NewLabel("Ready")
 
 	scanBtn := widget.NewButtonWithIcon("Start Scan", theme.SearchIcon(), func() {
-		startScan(state)
+		if state.FolderPath == "" {
+			dialog.ShowError(fmt.Errorf("please select a folder"), state.Window)
+			return
+		}
+		info, err := os.Stat(state.FolderPath)
+		if err != nil || !info.IsDir() {
+			dialog.ShowError(fmt.Errorf("invalid folder"), state.Window)
+			return
+		}
+		startScan(state, folderEntry, progressBar, progressLabel)
 	})
 	scanBtn.Disable()
 
-	state.FolderPath.AddListener(binding.NewDataListener(func() {
-		folder, _ := state.FolderPath.Get()
-		scanBtn.Disable()
-		if folder != "" {
+	folderEntry.OnChanged = func(text string) {
+		state.FolderPath = text
+		if text != "" {
 			scanBtn.Enable()
+		} else {
+			scanBtn.Disable()
 		}
-	}))
-
-	progressBar := widget.NewProgressBarWithData(state.ProgressValue)
-	progressLabel := widget.NewLabelWithData(state.ProgressText)
+	}
 
 	progressContainer := container.NewVBox(progressBar, progressLabel)
 
@@ -114,45 +158,31 @@ func createMainUI(state *AppState) fyne.CanvasObject {
 	)
 }
 
-func startScan(state *AppState) {
-	folder, _ := state.FolderPath.Get()
-	if folder == "" {
-		dialog.ShowError(fmt.Errorf("please select a folder"), state.Window)
-		return
-	}
-
-	info, err := os.Stat(folder)
-	if err != nil || !info.IsDir() {
-		dialog.ShowError(fmt.Errorf("invalid folder"), state.Window)
-		return
-	}
-
-	scanAll, _ := state.ScanAll.Get()
-	state.IsScanning.Set(true)
-	state.ProgressText.Set("Scanning folder...")
-	state.ProgressValue.Set(0)
+func startScan(state *AppState, folderEntry *widget.Entry, progressBar *widget.ProgressBar, progressLabel *widget.Label) {
+	state.IsScanning = true
+	progressLabel.SetText("Scanning folder...")
+	progressBar.SetValue(0)
 
 	go func() {
-		groups, stats, err := scanner.FindDuplicates(folder, scanAll)
+		groups, stats, err := scanner.FindDuplicates(state.FolderPath, state.ScanAll)
 		if err != nil {
-			state.IsScanning.Set(false)
-			state.ProgressText.Set(fmt.Sprintf("Error: %v", err))
+			state.IsScanning = false
+			progressLabel.SetText(fmt.Sprintf("Error: %v", err))
 			return
 		}
 
-		state.ProgressText.Set(fmt.Sprintf("Found %d duplicate groups", len(groups)))
-		state.ProgressValue.Set(1)
+		progressLabel.SetText(fmt.Sprintf("Found %d duplicate groups", len(groups)))
+		progressBar.SetValue(1)
 
 		state.Groups = groups
-		state.IsScanning.Set(false)
+		state.IsScanning = false
 
+		state.Window.Content().Refresh()
 		showResults(state, stats)
 	}()
 }
 
 func showResults(state *AppState, stats scanner.ScanStats) {
-	state.Window.Content().Refresh()
-
 	if len(state.Groups) == 0 {
 		state.Window.SetContent(createNoDuplicatesUI(state, stats))
 		return
@@ -238,13 +268,8 @@ func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject
 			return files[i].ModTime.Before(files[j].ModTime)
 		})
 
-		currentIndex := state.CurrentGroupIndex
-
 		for idx, f := range files {
-			row := createFileRow(idx+1, f, state, func() {
-				state.CurrentGroupIndex = currentIndex + 1
-				state.Window.SetContent(createResultsUI(state, stats))
-			})
+			row := createFileRow(idx+1, f, state, stats)
 			groupsContainer.AddObject(row)
 		}
 
@@ -283,7 +308,7 @@ func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject
 	)
 }
 
-func createFileRow(num int, f scanner.FileInfo, state *AppState, onDelete func()) fyne.CanvasObject {
+func createFileRow(num int, f scanner.FileInfo, state *AppState, stats scanner.ScanStats) fyne.CanvasObject {
 	card := widget.NewCard(fmt.Sprintf("[%d] %s", num, f.Name), f.Path,
 		container.NewVBox(
 			widget.NewLabel(fmt.Sprintf("Size: %s | Modified: %s", formatBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"))),
@@ -295,10 +320,6 @@ func createFileRow(num int, f scanner.FileInfo, state *AppState, onDelete func()
 				moveToTrash(f.Path)
 				state.DeletedCount++
 				state.FreedBytes += f.Size
-
-				if onDelete != nil {
-					onDelete()
-				}
 
 				for i, g := range state.Groups {
 					if g.Hash == f.Hash {
@@ -325,7 +346,6 @@ func createFileRow(num int, f scanner.FileInfo, state *AppState, onDelete func()
 }
 
 func keepAndDelete(state *AppState, keepIndex int, files []scanner.FileInfo) {
-	_ = files[keepIndex]
 	for idx, f := range files {
 		if idx == keepIndex {
 			continue
@@ -356,7 +376,7 @@ func createFinalUI(state *AppState) fyne.CanvasObject {
 		state.CurrentGroupIndex = 0
 		state.DeletedCount = 0
 		state.FreedBytes = 0
-		state.FolderPath.Set("")
+		state.FolderPath = ""
 		state.Window.SetContent(createMainUI(state))
 	})
 
@@ -429,5 +449,3 @@ func formatBytes(b int64) string {
 	}
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
-
-var _ = strconv.Itoa

@@ -1,0 +1,5 @@
+.DS_Store
+dist/
+fyne-cross/
+dupclean.app/
+dupclean.app

@@ -142,10 +142,10 @@ func moveToTrash(path string) error {
 func printHeader() {
 	fmt.Print(colorReset)
 	fmt.Println()
-	fmt.Printf("%s╔═══════════════════════════════════════╗%s\n", colorPurple, colorReset)
+	fmt.Printf("%s╔═════════════════════════════════════════╗%s\n", colorPurple, colorReset)
 	fmt.Printf("%s║%s  %s🎧 DUPCLEAN%s  — Audio Duplicate Hunter  %s║%s\n",
 		colorPurple, colorReset, colorBold+colorWhite, colorReset, colorPurple, colorReset)
-	fmt.Printf("%s╚═══════════════════════════════════════╝%s\n\n", colorPurple, colorReset)
+	fmt.Printf("%s╚═════════════════════════════════════════╝%s\n\n", colorPurple, colorReset)
 }
 
 func printScanSummary(stats scanner.ScanStats, groupCount int) {
