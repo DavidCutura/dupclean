@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"dupclean/internal/scanner"
+	"github.com/davidcutura/dupclean/internal/scanner"
 )
 
 const (
