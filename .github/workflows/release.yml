@@ -65,7 +65,7 @@ jobs:
         - uses: actions/upload-artifact@v4
           with:
             name: mac-amd64
-            path: dist/dupclean-intel-amd64.dmg
+            path: dist/dupclean-darwin-amd64.dmg
 
   build-linux:
     runs-on: ubuntu-latest
