@@ -12,38 +12,60 @@ jobs:
   build-mac-arm64:
     runs-on: macos-latest  # GitHub's macos-latest is arm64 (M1)
     steps:
+        - name: Install Fyne tool
+          run: go install fyne.io/fyne/v2/cmd/fyne@latest
         - uses: actions/checkout@v4
         - uses: actions/setup-go@v5
           with:
             go-version: '1.22'
         - name: Install macOS deps
           run: brew install pkg-config
-        - name: Build macOS arm64
+        - name: Build and package macOS arm64
           run: |
             mkdir -p dist
-            go build -o dist/dupclean-darwin-arm64 .
+            fyne package -os darwin -name DupClean -appID com.dupclean.app -icon Icon.png
+            mv DupClean.app dist/
+
+        - name: Create DMG
+          run: |
+            hdiutil create -volname "DupClean" \
+              -srcfolder dist/DupClean.app \
+              -v -foramte UDZO \
+              dist/dupclean-darwin-arm64.dmg
+
         - uses: actions/upload-artifact@v4
           with:
             name: mac-arm64
-            path: dist/
+            path: dist/dupclean-darwin-arm64.dmg
 
   build-mac-amd64:
     runs-on: macos-15-intel  # macos-13 is the last Intel runner on GitHub Actions
     steps:
+        - name: Install Fyne tool
+          run: go install fyne.io/fyne/v2/cmd/fyne@latest
         - uses: actions/checkout@v4
         - uses: actions/setup-go@v5
           with:
             go-version: '1.22'
         - name: Install macOS deps
           run: brew install pkg-config
-        - name: Build macOS amd64
+        - name: Build and package macOS amd64
           run: |
             mkdir -p dist
-            go build -o dist/dupclean-darwin-amd64 .
+            fyne package -os intel -name -DupClean -appID com.dupclean.app -icon Icon.png
+            mv DupClean.app dist/
+
+        - name: Create DMG
+          run: |
+            hdiutil create -volname "DupClean" \
+              -srcfodler dist/DupClean.app \
+              -ov -format UDZO \
+              dist/dupclean-intel-amd64.dmg
+
         - uses: actions/upload-artifact@v4
           with:
             name: mac-amd64
-            path: dist/
+            path: dist/dupclean-intel-amd64.dmg
 
   build-linux:
     runs-on: ubuntu-latest
