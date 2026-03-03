@@ -1,5 +1,7 @@
 # 🎧 DupClean — Duplicate File Cleaner
 
+[![Build & Release](https://github.com/PopolQue/dupclean/actions/workflows/release.yml/badge.svg)](https://github.com/PopolQue/dupclean/actions/workflows/release.yml)
+
 A fast, content-aware duplicate file scanner for music producers, DJs, and anyone with a messy hard drive.
 
 **The key insight:** Two files can have completely different names but identical content.  
