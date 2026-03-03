@@ -1,4 +1,4 @@
-# 🎧 DupClean — Duplicate File Cleaner
+# 🎧 DupClean — Redundant File Cleaner
 
 [![Build & Release](https://github.com/PopolQue/dupclean/actions/workflows/release.yml/badge.svg)](https://github.com/PopolQue/dupclean/actions/workflows/release.yml)
 
