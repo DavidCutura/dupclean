@@ -9,22 +9,24 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"dupclean/scanner"
 )
 
 const (
-	colorReset  = "\033[0m"
-	colorRed    = "\033[31m"
-	colorGreen  = "\033[32m"
-	colorYellow = "\033[33m"
-	colorBlue   = "\033[34m"
-	colorPurple = "\033[35m"
-	colorCyan   = "\033[36m"
-	colorWhite  = "\033[37m"
-	colorGray   = "\033[90m"
-	colorBold   = "\033[1m"
-	colorDim    = "\033[2m"
+	colorReset     = "\033[0m"
+	colorRed       = "\033[31m"
+	colorGreen     = "\033[32m"
+	colorYellow    = "\033[33m"
+	colorBlue      = "\033[34m"
+	colorPurple    = "\033[35m"
+	colorCyan      = "\033[36m"
+	colorWhite     = "\033[37m"
+	colorGray      = "\033[90m"
+	colorBold      = "\033[1m"
+	colorDim       = "\033[2m"
+	colorUnderline = "\033[4m"
 )
 
 // Run is the main entry point for the interactive UI
@@ -32,9 +34,9 @@ func Run(groups []scanner.DuplicateGroup, stats scanner.ScanStats) {
 	printHeader()
 
 	if len(groups) == 0 {
-		fmt.Printf("\n%s✅ No duplicates found!%s Your drive is clean.\n\n", colorGreen+colorBold, colorReset)
-		fmt.Printf("%sScan completed in %s — %d files checked%s\n\n",
-			colorGray, stats.ScanDuration.Round(1000000), stats.TotalScanned, colorReset)
+		fmt.Printf("\n%s%s No duplicates found!%s Your drive is clean.%s\n\n", colorBold, colorGreen, colorReset, colorReset)
+		fmt.Printf("%s Scan completed in %s%s — %d files checked%s\n\n",
+			colorDim, stats.ScanDuration.Round(time.Second), colorReset, stats.TotalScanned, colorReset)
 		return
 	}
 
@@ -44,17 +46,24 @@ func Run(groups []scanner.DuplicateGroup, stats scanner.ScanStats) {
 	})
 
 	printScanSummary(stats, len(groups))
+	printControlsHelp()
 
 	reader := bufio.NewReader(os.Stdin)
 	deletedCount := 0
 	var freedBytes int64
+	skipAllRemaining := false
 
 	for i, group := range groups {
-		fmt.Printf("\n%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", colorGray, colorReset)
-		fmt.Printf("%s Group %d of %d%s  %s(identical audio content)%s\n",
-			colorBold+colorCyan, i+1, len(groups), colorReset,
-			colorGray, colorReset)
-		fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", colorGray, colorReset)
+		if skipAllRemaining {
+			break
+		}
+
+		fmt.Printf("\n%s%s", colorCyan, strings.Repeat("─", 70))
+		fmt.Printf("%s\n", colorReset)
+		fmt.Printf("%s Group %d of %d%s  %s• identical audio content •  %s%s each%s\n",
+			colorBold+colorWhite, i+1, len(groups), colorReset,
+			colorGray, colorDim, formatBytes(group.Files[0].Size), colorReset)
+		fmt.Printf("%s%s%s\n", colorCyan, strings.Repeat("─", 70), colorReset)
 
 		// Sort files: prefer files higher in the directory tree (shorter path)
 		files := group.Files
@@ -68,51 +77,54 @@ func Run(groups []scanner.DuplicateGroup, stats scanner.ScanStats) {
 		})
 
 		for idx, f := range files {
-			num := fmt.Sprintf("[%d]", idx+1)
-			fmt.Printf("\n  %s%s%s  %s%s%s\n",
-				colorYellow+colorBold, num, colorReset,
-				colorWhite+colorBold, f.Name, colorReset)
+			num := fmt.Sprintf("%s[%d]%s", colorYellow+colorBold, idx+1, colorReset)
+			fmt.Printf("\n  %s  %s%s%s\n", num, colorBold, f.Name, colorReset)
 			fmt.Printf("       %s%s%s\n", colorGray, f.Path, colorReset)
-			fmt.Printf("       %sSize: %s  Modified: %s%s\n",
+			fmt.Printf("       %s %s  •  %s%s\n",
 				colorDim, formatBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"), colorReset)
 		}
 
-		fmt.Printf("\n%s  Keep which file? (1-%d)  [s]kip  [a]ll skip  [q]uit%s\n  > ",
-			colorGray, len(files), colorReset)
+		fmt.Printf("\n%s  Keep which file?%s\n", colorBold, colorReset)
+		fmt.Printf("  %s[1-%d]%s Keep that file, delete others\n", colorYellow, len(files), colorReset)
+		fmt.Printf("  %s[s]%s Skip this group\n", colorYellow, colorReset)
+		fmt.Printf("  %s[a]%s Skip all remaining groups\n", colorYellow, colorReset)
+		fmt.Printf("  %s[q]%s Quit\n", colorYellow, colorReset)
+		fmt.Printf("\n  %s>%s ", colorCyan, colorReset)
 
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(strings.ToLower(input))
 
 		switch input {
 		case "q", "quit":
-			fmt.Printf("\n%s⏹  Stopped early.%s\n", colorYellow, colorReset)
+			fmt.Printf("\n%s⏹  Stopped early.%s You can resume later.\n\n", colorYellow+colorBold, colorReset)
 			goto done
 		case "s", "skip", "":
-			fmt.Printf("  %s↷ Skipped%s\n", colorGray, colorReset)
+			fmt.Printf("  %s↷ Skipped this group%s\n", colorGray, colorReset)
 			continue
 		case "a":
-			fmt.Printf("\n%s↷ Skipping all remaining groups.%s\n", colorGray, colorReset)
+			fmt.Printf("\n%s↷ Skipping all remaining groups.%s\n", colorGray+colorBold, colorReset)
+			skipAllRemaining = true
 			goto done
 		default:
 			choice, err := strconv.Atoi(input)
 			if err != nil || choice < 1 || choice > len(files) {
-				fmt.Printf("  %s⚠️  Invalid choice, skipping.%s\n", colorYellow, colorReset)
+				fmt.Printf("  %s Invalid choice. Please enter a number between 1 and %d.%s\n", colorYellow, len(files), colorReset)
 				continue
 			}
 
 			keepFile := files[choice-1]
+			fmt.Printf("\n  %s✓ Keeping:%s %s%s%s\n", colorGreen+colorBold, colorReset, colorWhite, keepFile.Name, colorReset)
+
 			for idx, f := range files {
 				if idx == choice-1 {
-					fmt.Printf("  %s✓ Keeping:%s %s\n", colorGreen, colorReset, f.Name)
 					continue
 				}
 				if err := moveToTrash(f.Path); err != nil {
-					fmt.Printf("  %s❌ Could not trash %s: %v%s\n", colorRed, f.Name, err, colorReset)
+					fmt.Printf("  %s Could not delete %s: %v%s\n", colorRed, f.Name, err, colorReset)
 				} else {
-					fmt.Printf("  %s🗑  Trashed:%s %s%s%s\n", colorRed, colorReset, colorGray, f.Name, colorReset)
+					fmt.Printf("  %s Deleted:%s %s%s%s\n", colorRed, colorReset, colorGray, f.Name, colorReset)
 					deletedCount++
 					freedBytes += f.Size
-					_ = keepFile
 				}
 			}
 		}
@@ -142,32 +154,47 @@ func moveToTrash(path string) error {
 func printHeader() {
 	fmt.Print(colorReset)
 	fmt.Println()
-	fmt.Printf("%s╔═════════════════════════════════════════╗%s\n", colorPurple, colorReset)
-	fmt.Printf("%s║%s  %s🎧 DUPCLEAN%s  — Audio Duplicate Hunter  %s║%s\n",
+	fmt.Printf("%s╔═══════════════════════════════════════════════════════╗%s\n", colorPurple+colorBold, colorReset)
+	fmt.Printf("%s║%s  %sDUPCLEAN%s  — Duplicate File Hunter          %s║%s\n",
 		colorPurple, colorReset, colorBold+colorWhite, colorReset, colorPurple, colorReset)
-	fmt.Printf("%s╚═════════════════════════════════════════╝%s\n\n", colorPurple, colorReset)
+	fmt.Printf("%s╚═══════════════════════════════════════════════════════╝%s\n\n", colorPurple+colorBold, colorReset)
 }
 
 func printScanSummary(stats scanner.ScanStats, groupCount int) {
-	fmt.Printf("%s📊 Scan complete in %s%s\n", colorBold, stats.ScanDuration.Round(1000000), colorReset)
-	fmt.Printf("   %sFiles scanned:%s   %d\n", colorGray, colorReset, stats.TotalScanned)
-	fmt.Printf("   %sDuplicate groups:%s %d\n", colorGray, colorReset, groupCount)
-	fmt.Printf("   %sExtra copies:%s    %d  (%s wasted)\n",
-		colorGray, colorReset, stats.TotalDupes, formatBytes(stats.WastedBytes))
+	fmt.Printf("%sScan Summary%s\n", colorBold+colorCyan, colorReset)
+	fmt.Printf("%s\n", strings.Repeat("─", 40))
+	fmt.Printf("   %sDuration:%s     %s%s%s\n", colorGray, colorReset, colorWhite, stats.ScanDuration.Round(time.Second), colorReset)
+	fmt.Printf("   %sFiles:%s       %s%d%s\n", colorGray, colorReset, colorWhite, stats.TotalScanned, colorReset)
+	fmt.Printf("   %sGroups:%s      %s%d%s\n", colorGray, colorReset, colorWhite, groupCount, colorReset)
+	fmt.Printf("   %sExtra:%s       %s%d%s copies\n", colorGray, colorReset, colorWhite, stats.TotalDupes, colorReset)
+	fmt.Printf("   %sWasted:%s      %s%s%s\n", colorGray, colorReset, colorRed+colorBold, formatBytes(stats.WastedBytes), colorReset)
+	fmt.Println()
+}
+
+func printControlsHelp() {
+	fmt.Printf("%sControls:%s\n", colorBold+colorUnderline, colorReset)
+	fmt.Printf("  %s[1-9]%s  Keep file #, delete others\n", colorYellow, colorReset)
+	fmt.Printf("  %s[s]%s    Skip this group\n", colorYellow, colorReset)
+	fmt.Printf("  %s[a]%s    Skip all remaining\n", colorYellow, colorReset)
+	fmt.Printf("  %s[q]%s    Quit\n", colorYellow, colorReset)
+	fmt.Println()
 }
 
 func printFinalSummary(deleted int, freed int64) {
 	fmt.Println()
-	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", colorGray, colorReset)
+	fmt.Printf("%s%s%s\n", colorCyan, strings.Repeat("─", 70), colorReset)
+
 	if deleted == 0 {
-		fmt.Printf("\n%s  Nothing was deleted. Your files are safe.%s\n\n", colorYellow, colorReset)
+		fmt.Printf("\n%s Nothing was deleted.%s Your files are safe.\n\n", colorYellow+colorBold, colorReset)
 	} else {
-		fmt.Printf("\n  %s✅ Done!%s  Moved %s%d file(s)%s to Trash  →  freed %s%s%s\n\n",
-			colorGreen+colorBold, colorReset,
-			colorBold, deleted, colorReset,
-			colorBold, formatBytes(freed), colorReset)
-		fmt.Printf("  %sTip: Empty your Trash to reclaim disk space.%s\n\n", colorGray, colorReset)
+		fmt.Printf("\n  %s Cleanup Complete!%s\n\n", colorGreen+colorBold, colorReset)
+		fmt.Printf("      Files deleted:  %s%d%s\n", colorBold, deleted, colorReset)
+		fmt.Printf("      Space freed:    %s%s%s\n\n", colorGreen+colorBold, formatBytes(freed), colorReset)
+		fmt.Printf("  %s Tip: Empty your Trash to reclaim disk space.%s\n\n", colorDim, colorReset)
 	}
+
+	fmt.Printf("%s%s%s\n", colorCyan, strings.Repeat("─", 70), colorReset)
+	fmt.Println()
 }
 
 func formatBytes(b int64) string {

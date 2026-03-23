@@ -39,7 +39,7 @@ func main() {
 }
 
 func printHelp() {
-	fmt.Println("DupClean — Audio Duplicate Cleaner")
+	fmt.Println("DupClean — Duplicate File Cleaner")
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  dupclean              Launch GUI")
