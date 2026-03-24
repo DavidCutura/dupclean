@@ -40,6 +40,10 @@ sudo mv dupclean /usr/local/bin/
 # Coming soon
 ```
 
+If your Mac warns you that the file is damaged, try removing the quarantine after installing:
+```bash
+sudo xattr -d com.apple.quarantine /Applications/DupClean.app
+```
 ---
 
 ### Linux
