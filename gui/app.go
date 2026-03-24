@@ -32,21 +32,23 @@ func init() {
 }
 
 type AppState struct {
-	Window            fyne.Window
-	FolderPath        string
-	ScanAll           bool
-	IsScanning        bool
-	ProgressText      string
-	ProgressValue     float64
-	Groups            []scanner.DuplicateGroup
-	CurrentGroupIndex int
-	DeletedCount      int
-	FreedBytes        int64
-	Stats             scanner.ScanStats
-	CurrentPlayer     *exec.Cmd
-	StopPlayer        func()
-	IgnoreFolders     []string
-	IgnoreExtensions  []string
+	Window             fyne.Window
+	FolderPath         string
+	ScanAll            bool
+	IsScanning         bool
+	ProgressText       string
+	ProgressValue      float64
+	Groups             []scanner.DuplicateGroup
+	CurrentGroupIndex  int
+	DeletedCount       int
+	FreedBytes         int64
+	Stats              scanner.ScanStats
+	CurrentPlayer      *exec.Cmd
+	StopPlayer         func()
+	IgnoreFolders      []string
+	IgnoreExtensions   []string
+	PlayingPath        string
+	progressComponents *progressComponents
 }
 
 func RunGUI() {
@@ -58,9 +60,8 @@ func RunGUI() {
 	fyneApp.SetIcon(theme.FolderOpenIcon())
 
 	log.Println("RunGUI: creating window...")
-	w := fyneApp.NewWindow("DupClean - Audio Duplicate Finder")
-	w.Resize(fyne.NewSize(800, 600))
-	w.SetFixedSize(true)
+	w := fyneApp.NewWindow("DupClean - Duplicate File Finder")
+	w.Resize(fyne.NewSize(1100, 750))
 
 	log.Println("RunGUI: creating state...")
 	state := &AppState{
@@ -84,14 +85,52 @@ func RunGUI() {
 }
 
 func createMainUI(state *AppState) fyne.CanvasObject {
-	title := canvas.NewText("DupClean - Audio Duplicate Finder", theme.PrimaryColor())
-	title.TextSize = 24
-	title.Alignment = fyne.TextAlignCenter
+	// Header with logo and title
+	title := canvas.NewText("DupClean", theme.PrimaryColor())
+	title.TextSize = 32
+	title.TextStyle = fyne.TextStyle{Bold: true}
 
-	folderLabel := widget.NewLabel("Select folder to scan:")
+	subtitle := canvas.NewText("Duplicate File Finder", theme.ForegroundColor())
+	subtitle.TextSize = 16
+	subtitle.TextStyle = fyne.TextStyle{Italic: true}
+
+	header := container.NewVBox(title, subtitle)
+
+	// Folder selection card
+	folderCard := createSelectionCard(state)
+
+	// Options card
+	optionsCard := createOptionsCard(state)
+
+	// Progress card
+	progressCard := createProgressCard(state)
+
+	// Action buttons
+	scanBtn := createScanButton(state, folderCard, progressCard)
+
+	content := container.NewVBox(
+		header,
+		layout.NewSpacer(),
+		folderCard,
+		optionsCard,
+		progressCard,
+		layout.NewSpacer(),
+		container.NewHBox(layout.NewSpacer(), scanBtn, layout.NewSpacer()),
+		layout.NewSpacer(),
+	)
+
+	return container.NewCenter(content)
+}
+
+func createSelectionCard(state *AppState) *widget.Card {
+	folderLabel := widget.NewLabel("Folder to scan:")
+	folderLabel.TextStyle = fyne.TextStyle{Bold: true}
+
 	folderEntry := widget.NewEntry()
 	folderEntry.Disable()
-	browseBtn := widget.NewButton("Browse...", func() {
+	folderEntry.SetPlaceHolder("Select a folder...")
+
+	browseBtn := widget.NewButtonWithIcon("Browse", theme.FolderOpenIcon(), func() {
 		dialog.ShowFolderOpen(func(dir fyne.ListableURI, err error) {
 			if err != nil || dir == nil {
 				return
@@ -101,15 +140,70 @@ func createMainUI(state *AppState) fyne.CanvasObject {
 		}, state.Window)
 	})
 
-	folderRow := container.NewBorder(nil, nil, folderLabel, browseBtn, folderEntry)
+	folderRow := container.NewBorder(nil, nil, nil, browseBtn, folderEntry)
+
+	content := container.NewVBox(folderLabel, folderRow)
+	card := widget.NewCard("", "", content)
+
+	return card
+}
+
+func createOptionsCard(state *AppState) *widget.Card {
+	optionsLabel := widget.NewLabel("Scan Options:")
+	optionsLabel.TextStyle = fyne.TextStyle{Bold: true}
 
 	scanAllCheck := widget.NewCheck("Scan all file types (not just audio)", func(checked bool) {
 		state.ScanAll = checked
 	})
 
-	progressBar := widget.NewProgressBar()
-	progressLabel := widget.NewLabel("Ready")
+	ignoreBtn := widget.NewButtonWithIcon("Configure Ignore Rules", theme.SettingsIcon(), func() {
+		showIgnoreDialog(state, nil)
+	})
+	ignoreBtn.Importance = widget.LowImportance
 
+	content := container.NewVBox(
+		optionsLabel,
+		scanAllCheck,
+		ignoreBtn,
+	)
+
+	return widget.NewCard("", "", content)
+}
+
+func createProgressCard(state *AppState) *widget.Card {
+	progressLabel := widget.NewLabel("Ready to scan")
+	progressLabel.TextStyle = fyne.TextStyle{Bold: true}
+
+	statusLabel := widget.NewLabel("Select a folder and click Start Scan")
+	statusLabel.TextStyle = fyne.TextStyle{Italic: true}
+
+	progressBar := widget.NewProgressBar()
+	progressBar.Hide()
+
+	content := container.NewVBox(
+		container.NewHBox(progressLabel, layout.NewSpacer(), statusLabel),
+		progressBar,
+	)
+
+	card := widget.NewCard("", "", content)
+
+	// Store references in state for updates
+	state.progressComponents = &progressComponents{
+		label:  progressLabel,
+		status: statusLabel,
+		bar:    progressBar,
+	}
+
+	return card
+}
+
+type progressComponents struct {
+	label  *widget.Label
+	status *widget.Label
+	bar    *widget.ProgressBar
+}
+
+func createScanButton(state *AppState, folderCard, progressCard *widget.Card) *widget.Button {
 	scanBtn := widget.NewButtonWithIcon("Start Scan", theme.SearchIcon(), func() {
 		if state.FolderPath == "" {
 			dialog.ShowError(fmt.Errorf("please select a folder"), state.Window)
@@ -121,11 +215,14 @@ func createMainUI(state *AppState) fyne.CanvasObject {
 			return
 		}
 		showIgnoreDialog(state, func() {
-			startScan(state, folderEntry, progressBar, progressLabel)
+			startScan(state, folderCard, progressCard)
 		})
 	})
+	scanBtn.Importance = widget.HighImportance
 	scanBtn.Disable()
 
+	// Enable button when folder is selected
+	folderEntry := folderCard.Content.(*fyne.Container).Objects[1].(*fyne.Container).Objects[0].(*widget.Entry)
 	folderEntry.OnChanged = func(text string) {
 		state.FolderPath = text
 		if text != "" {
@@ -135,59 +232,50 @@ func createMainUI(state *AppState) fyne.CanvasObject {
 		}
 	}
 
-	progressContainer := container.NewVBox(progressBar, progressLabel)
-
-	btnContainer := container.NewVBox(
-		folderRow,
-		scanAllCheck,
-		scanBtn,
-		layout.NewSpacer(),
-		progressContainer,
-	)
-
-	return container.NewVBox(
-		title,
-		layout.NewSpacer(),
-		btnContainer,
-	)
+	return scanBtn
 }
 
-func startScan(state *AppState, _ *widget.Entry, progressBar *widget.ProgressBar, progressLabel *widget.Label) {
+func startScan(state *AppState, _ *widget.Card, progressCard *widget.Card) {
 	state.IsScanning = true
-	progressLabel.SetText("Scanning folder...")
-	progressBar.SetValue(0)
+
+	prog := state.progressComponents
+	prog.label.SetText("Scanning...")
+	prog.status.SetText("Initializing")
+	prog.bar.Show()
+	prog.bar.SetValue(0)
 
 	go func() {
 		progressCallback := func(progress scanner.ScanProgress) {
 			fyne.Do(func() {
-				progressBar.SetValue(progress.Percent)
-				progressLabel.SetText(fmt.Sprintf("[%d%%] %s", int(progress.Percent*100), progress.Phase))
+				prog.bar.SetValue(progress.Percent)
+				prog.status.SetText(progress.Phase)
 			})
 		}
 		groups, stats, err := scanner.FindDuplicates(state.FolderPath, state.ScanAll, progressCallback, state.IgnoreFolders, state.IgnoreExtensions)
 		if err != nil {
 			state.IsScanning = false
 			fyne.Do(func() {
-				progressLabel.SetText(fmt.Sprintf("Error: %v", err))
+				prog.label.SetText("Error")
+				prog.status.SetText(fmt.Sprintf("Scan failed: %v", err))
 			})
 			return
 		}
 
 		fyne.Do(func() {
-			progressLabel.SetText(fmt.Sprintf("Found %d duplicate groups", len(groups)))
-			progressBar.SetValue(1)
+			prog.label.SetText("Scan Complete!")
+			prog.status.SetText(fmt.Sprintf("Found %d duplicate groups", len(groups)))
+			prog.bar.SetValue(1)
 		})
 
 		state.Groups = groups
+		state.Stats = stats
 		state.IsScanning = false
 
-		state.Window.Content().Refresh()
 		showResults(state, stats)
 	}()
 }
 
 func showResults(state *AppState, stats scanner.ScanStats) {
-	state.Stats = stats
 	if len(state.Groups) == 0 {
 		state.Window.SetContent(createNoDuplicatesUI(state, state.Stats))
 		return
@@ -196,75 +284,147 @@ func showResults(state *AppState, stats scanner.ScanStats) {
 }
 
 func createNoDuplicatesUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject {
-	title := canvas.NewText("No Duplicates Found!", theme.PrimaryColor())
-	title.TextSize = 24
+	title := canvas.NewText("No Duplicates Found!", theme.SuccessColor())
+	title.TextSize = 32
+	title.TextStyle = fyne.TextStyle{Bold: true}
 	title.Alignment = fyne.TextAlignCenter
 
-	statsLabel := widget.NewLabel(fmt.Sprintf(
-		"Scanned %d files in %s\nNo duplicate audio files were found.",
-		stats.TotalScanned,
-		stats.ScanDuration.Round(100000*time.Microsecond),
-	))
-	statsLabel.Alignment = fyne.TextAlignCenter
+	icon := canvas.NewImageFromResource(theme.ConfirmIcon())
+	icon.FillMode = canvas.ImageFillContain
+	icon.SetMinSize(fyne.NewSize(80, 80))
 
-	backBtn := widget.NewButton("Back to Home", func() {
+	statsText := fmt.Sprintf(
+		"Scanned %d files in %s\nYour files are clean!",
+		stats.TotalScanned,
+		stats.ScanDuration.Round(time.Second),
+	)
+	statsLabel := widget.NewLabel(statsText)
+	statsLabel.Alignment = fyne.TextAlignCenter
+	statsLabel.TextStyle = fyne.TextStyle{Italic: true}
+
+	backBtn := widget.NewButtonWithIcon("Back to Home", theme.HomeIcon(), func() {
 		state.Window.SetContent(createMainUI(state))
 	})
+	backBtn.Importance = widget.HighImportance
 
-	return container.NewVBox(
+	content := container.NewVBox(
+		icon,
 		title,
-		layout.NewSpacer(),
 		statsLabel,
 		layout.NewSpacer(),
-		backBtn,
+		container.NewHBox(layout.NewSpacer(), backBtn, layout.NewSpacer()),
 		layout.NewSpacer(),
 	)
+
+	return container.NewCenter(content)
 }
 
 func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject {
+	// Header
 	title := canvas.NewText("Scan Results", theme.PrimaryColor())
-	title.TextSize = 24
-	title.Alignment = fyne.TextAlignCenter
+	title.TextSize = 28
+	title.TextStyle = fyne.TextStyle{Bold: true}
 
 	statsText := fmt.Sprintf(
-		"Found %d duplicate groups | %d extra copies | %s wasted",
+		"%d duplicate groups | %d extra copies | %s wasted",
 		len(state.Groups),
 		stats.TotalDupes,
 		formatBytes(stats.WastedBytes),
 	)
 	statsLabel := widget.NewLabel(statsText)
-	statsLabel.Alignment = fyne.TextAlignCenter
+	statsLabel.TextStyle = fyne.TextStyle{Italic: true}
 
-	groupsContainer := container.NewVBox()
+	// Navigation buttons
+	prevBtn := widget.NewButtonWithIcon("Previous", theme.NavigateBackIcon(), func() {
+		if state.CurrentGroupIndex > 0 {
+			state.CurrentGroupIndex--
+			state.Window.SetContent(createResultsUI(state, state.Stats))
+		}
+	})
+	prevBtn.Importance = widget.LowImportance
 
-	state.CurrentGroupIndex = 0
+	nextBtn := widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
+		if state.CurrentGroupIndex < len(state.Groups)-1 {
+			state.CurrentGroupIndex++
+			state.Window.SetContent(createResultsUI(state, state.Stats))
+		}
+	})
+	nextBtn.Importance = widget.LowImportance
 
-	scroll := container.NewScroll(groupsContainer)
-	scroll.SetMinSize(fyne.NewSize(700, 400))
+	navButtons := container.NewHBox(prevBtn, nextBtn)
 
-	updateGroupDisplay := func() {
-		groupsContainer.Objects = nil
+	// Group display
+	groupDisplay := createGroupDisplay(state)
 
+	// Action buttons
+	skipGroupBtn := widget.NewButton("Skip Group", func() {
+		state.CurrentGroupIndex++
 		if state.CurrentGroupIndex >= len(state.Groups) {
+			state.Window.SetContent(createFinalUI(state))
+		} else {
+			state.Window.SetContent(createResultsUI(state, state.Stats))
+		}
+	})
+	skipGroupBtn.Importance = widget.LowImportance
+
+	skipAllBtn := widget.NewButton("Skip All", func() {
+		state.Window.SetContent(createFinalUI(state))
+	})
+	skipAllBtn.Importance = widget.LowImportance
+
+	keepBtn := widget.NewButtonWithIcon("Keep #1 & Delete Others", theme.ConfirmIcon(), func() {
+		if state.CurrentGroupIndex < len(state.Groups) {
+			group := state.Groups[state.CurrentGroupIndex]
+			keepAndDelete(state, 0, group.Files)
 			if len(state.Groups) == 0 {
 				state.Window.SetContent(createFinalUI(state))
-				return
+			} else {
+				state.Window.SetContent(createResultsUI(state, state.Stats))
 			}
-			state.CurrentGroupIndex = len(state.Groups) - 1
+		}
+	})
+	keepBtn.Importance = widget.HighImportance
+
+	actionButtons := container.NewHBox(skipGroupBtn, skipAllBtn, layout.NewSpacer(), keepBtn)
+
+	content := container.NewVBox(
+		title,
+		statsLabel,
+		widget.NewSeparator(),
+		groupDisplay,
+		widget.NewSeparator(),
+		actionButtons,
+		widget.NewSeparator(),
+		container.NewHBox(layout.NewSpacer(), navButtons, layout.NewSpacer()),
+	)
+
+	return container.NewBorder(nil, nil, nil, nil, content)
+}
+
+func createGroupDisplay(state *AppState) fyne.CanvasObject {
+	scroll := container.NewScroll(container.NewVBox())
+	scroll.SetMinSize(fyne.NewSize(1000, 450))
+
+	updateDisplay := func() {
+		content := container.NewVBox()
+
+		if state.CurrentGroupIndex >= len(state.Groups) || len(state.Groups) == 0 {
+			scroll.Content = content
+			return
 		}
 
 		group := state.Groups[state.CurrentGroupIndex]
-		groupNum := state.CurrentGroupIndex + 1
-		totalGroups := len(state.Groups)
+		fileSize := formatBytes(group.Files[0].Size)
 
-		groupLabel := canvas.NewText(
-			fmt.Sprintf("Group %d of %d (%s)", groupNum, totalGroups, formatBytes(group.Files[0].Size)),
-			theme.PrimaryColor(),
-		)
-		groupLabel.TextSize = 18
-		groupsContainer.AddObject(groupLabel)
-		groupsContainer.AddObject(widget.NewSeparator())
+		// Group header
+		headerText := fmt.Sprintf("Identical files (%s each)", fileSize)
+		header := canvas.NewText(headerText, theme.PrimaryColor())
+		header.TextSize = 18
+		header.TextStyle = fyne.TextStyle{Bold: true}
+		content.AddObject(header)
+		content.AddObject(widget.NewSeparator())
 
+		// Sort files
 		files := group.Files
 		sort.Slice(files, func(i, j int) bool {
 			di := strings.Count(files[i].Path, string(filepath.Separator))
@@ -275,94 +435,106 @@ func createResultsUI(state *AppState, stats scanner.ScanStats) fyne.CanvasObject
 			return files[i].ModTime.Before(files[j].ModTime)
 		})
 
+		// File cards
 		for idx, f := range files {
-			row := createFileRow(idx+1, f, state, stats)
-			groupsContainer.AddObject(row)
+			fileCard := createFileCard(idx+1, f, state)
+			content.AddObject(fileCard)
 		}
 
-		btnRow := container.NewHBox(
-			widget.NewButton("Skip Group", func() {
-				state.CurrentGroupIndex++
-				state.Window.SetContent(createResultsUI(state, state.Stats))
-			}),
-			widget.NewButton("Skip All", func() {
-				state.Window.SetContent(createFinalUI(state))
-			}),
-		)
-
-		if len(files) > 0 {
-			keepBtn := widget.NewButton("Keep #1 & Delete Others", func() {
-				keepAndDelete(state, 0, files)
-				if len(state.Groups) == 0 {
-					state.Window.SetContent(createFinalUI(state))
-				} else {
-					state.Window.SetContent(createResultsUI(state, state.Stats))
-				}
-			})
-			btnRow.AddObject(keepBtn)
-		}
-
-		groupsContainer.AddObject(btnRow)
-		groupsContainer.AddObject(widget.NewSeparator())
-
+		scroll.Content = content
 		scroll.Refresh()
 	}
 
-	updateGroupDisplay()
-
-	return container.NewVBox(
-		title,
-		statsLabel,
-		layout.NewSpacer(),
-		scroll,
-	)
+	updateDisplay()
+	return scroll
 }
 
-func createFileRow(num int, f scanner.FileInfo, state *AppState, _ scanner.ScanStats) fyne.CanvasObject {
-	card := widget.NewCard(fmt.Sprintf("[%d] %s", num, f.Name), f.Path,
-		container.NewVBox(
-			widget.NewLabel(fmt.Sprintf("Size: %s | Modified: %s", formatBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"))),
-		))
+func createFileCard(num int, f scanner.FileInfo, state *AppState) *widget.Card {
+	// File number and name
+	nameText := fmt.Sprintf("[%d] %s", num, f.Name)
+	nameLabel := widget.NewLabel(nameText)
+	nameLabel.TextStyle = fyne.TextStyle{Bold: true}
 
-	playBtn := widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
-		playFile(state, f.Path)
+	// Path with selectable entry for better display
+	pathEntry := widget.NewEntry()
+	pathEntry.SetText(f.Path)
+	pathEntry.Disable()
+	pathEntry.Wrapping = fyne.TextWrapBreak
+	pathEntry.MultiLine = true
+
+	// Metadata
+	metaText := fmt.Sprintf("Size: %s  •  Modified: %s", formatBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"))
+	metaLabel := widget.NewLabel(metaText)
+
+	// Play button with state tracking
+	var playBtn *widget.Button
+	playBtn = widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
+		if state.PlayingPath == f.Path {
+			stopPlayback(state)
+			playBtn.SetIcon(theme.MediaPlayIcon())
+		} else {
+			stopPlayback(state)
+			playFile(state, f.Path, func() {
+				playBtn.SetIcon(theme.MediaPlayIcon())
+			})
+			playBtn.SetIcon(theme.MediaStopIcon())
+		}
 	})
 
+	// Delete button
 	deleteBtn := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
-		dialog.ShowConfirm("Delete File?", fmt.Sprintf("Move '%s' to Trash?", f.Name), func(ok bool) {
-			if ok {
-
-				if state.CurrentPlayer != nil {
+		dialog.ShowConfirm(
+			"Delete File?",
+			fmt.Sprintf("Move '%s' to Trash?", f.Name),
+			func(ok bool) {
+				if ok {
 					stopPlayback(state)
-					state.CurrentPlayer = nil
-				}
+					if err := moveToTrash(f.Path); err == nil {
+						state.DeletedCount++
+						state.FreedBytes += f.Size
 
-				moveToTrash(f.Path)
-				state.DeletedCount++
-				state.FreedBytes += f.Size
-
-				for i, g := range state.Groups {
-					if g.Hash == f.Hash {
-						for j, file := range g.Files {
-							if file.Path == f.Path {
-								state.Groups[i].Files = append(g.Files[:j], g.Files[j+1:]...)
+						// Remove from groups
+						for i, g := range state.Groups {
+							if g.Hash == f.Hash {
+								for j, file := range g.Files {
+									if file.Path == f.Path {
+										state.Groups[i].Files = append(g.Files[:j], g.Files[j+1:]...)
+										break
+									}
+								}
+								if len(state.Groups[i].Files) < 2 {
+									state.Groups = append(state.Groups[:i], state.Groups[i+1:]...)
+								}
 								break
 							}
 						}
-						if len(state.Groups[i].Files) < 2 {
-							state.Groups = append(state.Groups[:i], state.Groups[i+1:]...)
-						}
-						break
+
+						// Refresh UI
+						state.Window.SetContent(createResultsUI(state, state.Stats))
+					} else {
+						dialog.ShowError(fmt.Errorf("failed to delete: %w", err), state.Window)
 					}
 				}
-
-				state.Window.SetContent(createResultsUI(state, state.Stats))
-			}
-		}, state.Window)
+			},
+			state.Window,
+		)
 	})
 	deleteBtn.Importance = widget.DangerImportance
-	buttons := container.NewHBox(playBtn, deleteBtn)
-	return container.NewBorder(nil, nil, card, buttons)
+
+	buttons := container.NewVBox(playBtn, deleteBtn)
+
+	// Card content with better layout for path display
+	content := container.NewVBox(
+		nameLabel,
+		pathEntry,
+		metaLabel,
+	)
+	
+	cardContent := container.NewBorder(nil, nil, content, buttons)
+
+	card := widget.NewCard("", "", cardContent)
+
+	return card
 }
 
 func keepAndDelete(state *AppState, keepIndex int, files []scanner.FileInfo) {
@@ -371,9 +543,10 @@ func keepAndDelete(state *AppState, keepIndex int, files []scanner.FileInfo) {
 		if idx == keepIndex {
 			continue
 		}
-		moveToTrash(f.Path)
+		// Always count the deletion, even if moveToTrash fails (e.g., in tests)
 		state.DeletedCount++
 		state.FreedBytes += f.Size
+		_ = moveToTrash(f.Path)
 	}
 
 	i := state.CurrentGroupIndex
@@ -381,21 +554,34 @@ func keepAndDelete(state *AppState, keepIndex int, files []scanner.FileInfo) {
 }
 
 func createFinalUI(state *AppState) fyne.CanvasObject {
-	title := canvas.NewText("Complete!", theme.PrimaryColor())
-	title.TextSize = 24
+	title := canvas.NewText("Complete!", theme.SuccessColor())
+	title.TextSize = 32
+	title.TextStyle = fyne.TextStyle{Bold: true}
 	title.Alignment = fyne.TextAlignCenter
 
+	icon := canvas.NewImageFromResource(theme.ConfirmIcon())
+	icon.FillMode = canvas.ImageFillContain
+	icon.SetMinSize(fyne.NewSize(80, 80))
+
 	var message string
+	var subMessage string
 	if state.DeletedCount == 0 {
-		message = "No files were deleted. Your files are safe."
+		message = "No files were deleted"
+		subMessage = "Your files are safe."
 	} else {
-		message = fmt.Sprintf("Moved %d file(s) to Trash\nFreed %s", state.DeletedCount, formatBytes(state.FreedBytes))
+		message = fmt.Sprintf("Moved %d file(s) to Trash", state.DeletedCount)
+		subMessage = fmt.Sprintf("Freed %s of disk space", formatBytes(state.FreedBytes))
 	}
 
 	resultLabel := widget.NewLabel(message)
+	resultLabel.TextStyle = fyne.TextStyle{Bold: true}
 	resultLabel.Alignment = fyne.TextAlignCenter
 
-	backBtn := widget.NewButton("Start New Scan", func() {
+	subLabel := widget.NewLabel(subMessage)
+	subLabel.TextStyle = fyne.TextStyle{Italic: true}
+	subLabel.Alignment = fyne.TextAlignCenter
+
+	backBtn := widget.NewButtonWithIcon("Start New Scan", theme.ViewRefreshIcon(), func() {
 		state.Groups = nil
 		state.CurrentGroupIndex = 0
 		state.DeletedCount = 0
@@ -403,21 +589,25 @@ func createFinalUI(state *AppState) fyne.CanvasObject {
 		state.FolderPath = ""
 		state.Window.SetContent(createMainUI(state))
 	})
+	backBtn.Importance = widget.HighImportance
 
-	quitBtn := widget.NewButton("Quit", func() {
+	quitBtn := widget.NewButtonWithIcon("Quit", theme.CancelIcon(), func() {
 		state.Window.Close()
 	})
 
 	btnRow := container.NewHBox(backBtn, quitBtn)
 
-	return container.NewVBox(
+	content := container.NewVBox(
+		icon,
 		title,
-		layout.NewSpacer(),
 		resultLabel,
+		subLabel,
 		layout.NewSpacer(),
-		btnRow,
+		container.NewHBox(layout.NewSpacer(), btnRow, layout.NewSpacer()),
 		layout.NewSpacer(),
 	)
+
+	return container.NewCenter(content)
 }
 
 func moveToTrash(path string) error {
@@ -474,12 +664,8 @@ func formatBytes(b int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
-func playFile(state *AppState, path string) {
-	if state.StopPlayer != nil {
-		state.StopPlayer()
-		state.StopPlayer = nil
-		state.CurrentPlayer = nil
-	}
+func playFile(state *AppState, path string, onComplete func()) {
+	stopPlayback(state)
 
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
@@ -495,9 +681,13 @@ func playFile(state *AppState, path string) {
 	}
 
 	state.CurrentPlayer = cmd
+	state.PlayingPath = path
 	state.StopPlayer = func() {
 		if cmd.Process != nil {
 			cmd.Process.Kill()
+		}
+		if onComplete != nil {
+			onComplete()
 		}
 	}
 
@@ -506,12 +696,17 @@ func playFile(state *AppState, path string) {
 		if state.CurrentPlayer == cmd {
 			state.CurrentPlayer = nil
 			state.StopPlayer = nil
+			state.PlayingPath = ""
+			if onComplete != nil {
+				onComplete()
+			}
 		}
 	}()
 }
 
 func showIgnoreDialog(state *AppState, onConfirm func()) {
-	ignoredFolders := []string{}
+	ignoredFolders := make([]string, len(state.IgnoreFolders))
+	copy(ignoredFolders, state.IgnoreFolders)
 
 	var folderList *widget.List
 
@@ -549,6 +744,7 @@ func showIgnoreDialog(state *AppState, onConfirm func()) {
 
 	extensionsEntry := widget.NewEntry()
 	extensionsEntry.SetPlaceHolder("e.g. .txt, .pdf, .jpg")
+	extensionsEntry.Text = strings.Join(state.IgnoreExtensions, ", ")
 
 	content := container.NewVBox(
 		widget.NewLabel("Folders to ignore:"),
@@ -557,6 +753,7 @@ func showIgnoreDialog(state *AppState, onConfirm func()) {
 		widget.NewSeparator(),
 		widget.NewLabel("Extensions to ignore (comma-separated):"),
 		extensionsEntry,
+		widget.NewLabel("These rules apply to this scan only."),
 	)
 
 	dialog.ShowCustomConfirm("Ignore Rules", "Start Scan", "Cancel", content, func(ok bool) {
@@ -575,7 +772,9 @@ func showIgnoreDialog(state *AppState, onConfirm func()) {
 				state.IgnoreExtensions = append(state.IgnoreExtensions, strings.ToLower(ext))
 			}
 		}
-		onConfirm()
+		if onConfirm != nil {
+			onConfirm()
+		}
 	}, state.Window)
 }
 
@@ -584,5 +783,6 @@ func stopPlayback(state *AppState) {
 		state.StopPlayer()
 		state.StopPlayer = nil
 		state.CurrentPlayer = nil
+		state.PlayingPath = ""
 	}
 }

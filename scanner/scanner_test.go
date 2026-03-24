@@ -676,3 +676,121 @@ func TestFindDuplicates_IgnoreExtensionsUpperCase(t *testing.T) {
 		t.Errorf("Expected 1 group (.WAV should be treated as .wav), got %d", len(groups))
 	}
 }
+
+func TestHashFile_EmptyFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	filePath := filepath.Join(tmpDir, "empty.wav")
+	os.WriteFile(filePath, []byte{}, 0644)
+
+	hash, info, err := hashFile(filePath)
+	if err != nil {
+		t.Fatalf("hashFile() error = %v", err)
+	}
+
+	if hash == "" {
+		t.Error("hash should not be empty for empty file")
+	}
+
+	if info.Size() != 0 {
+		t.Errorf("info.Size() = %d, want 0", info.Size())
+	}
+}
+
+func TestHashFile_LargeFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := make([]byte, 1024*1024)
+	for i := range content {
+		content[i] = byte(i % 256)
+	}
+
+	filePath := filepath.Join(tmpDir, "large.wav")
+	os.WriteFile(filePath, content, 0644)
+
+	hash, info, err := hashFile(filePath)
+	if err != nil {
+		t.Fatalf("hashFile() error = %v", err)
+	}
+
+	if hash == "" {
+		t.Error("hash should not be empty for large file")
+	}
+
+	if info.Size() != int64(len(content)) {
+		t.Errorf("info.Size() = %d, want %d", info.Size(), len(content))
+	}
+}
+
+func TestDuplicateGroup_MultipleFiles(t *testing.T) {
+	files := []FileInfo{
+		{Path: "/path/file1.wav", Name: "file1.wav", Size: 1024, Hash: "samehash"},
+		{Path: "/path/file2.wav", Name: "file2.wav", Size: 1024, Hash: "samehash"},
+		{Path: "/path/file3.wav", Name: "file3.wav", Size: 1024, Hash: "samehash"},
+	}
+
+	dg := DuplicateGroup{
+		Hash:  "samehash",
+		Files: files,
+	}
+
+	if dg.Hash != "samehash" {
+		t.Errorf("Hash = %q, want %q", dg.Hash, "samehash")
+	}
+	if len(dg.Files) != 3 {
+		t.Errorf("len(Files) = %d, want 3", len(dg.Files))
+	}
+}
+
+func TestScanStats_Zero(t *testing.T) {
+	stats := ScanStats{}
+
+	if stats.TotalScanned != 0 {
+		t.Errorf("TotalScanned = %d, want 0", stats.TotalScanned)
+	}
+	if stats.TotalDupes != 0 {
+		t.Errorf("TotalDupes = %d, want 0", stats.TotalDupes)
+	}
+	if stats.WastedBytes != 0 {
+		t.Errorf("WastedBytes = %d, want 0", stats.WastedBytes)
+	}
+}
+
+func TestFindDuplicates_SameSizeDifferentContent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	os.WriteFile(filepath.Join(tmpDir, "file1.wav"), []byte("aaaa"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "file2.wav"), []byte("bbbb"), 0644)
+
+	groups, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
+	if err != nil {
+		t.Fatalf("FindDuplicates() error = %v", err)
+	}
+
+	if len(groups) != 0 {
+		t.Errorf("Expected 0 groups (same size but different content), got %d", len(groups))
+	}
+	if stats.TotalScanned != 2 {
+		t.Errorf("TotalScanned = %d, want 2", stats.TotalScanned)
+	}
+}
+
+func TestFindDuplicates_LargeWastedBytes(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := make([]byte, 10*1024*1024)
+
+	os.WriteFile(filepath.Join(tmpDir, "file1.wav"), content, 0644)
+	os.WriteFile(filepath.Join(tmpDir, "file2.wav"), content, 0644)
+	os.WriteFile(filepath.Join(tmpDir, "file3.wav"), content, 0644)
+
+	_, stats, err := FindDuplicates(tmpDir, false, nil, []string{}, []string{})
+	if err != nil {
+		t.Fatalf("FindDuplicates() error = %v", err)
+	}
+
+	expectedWasted := int64(10*1024*1024) * 2
+	if stats.WastedBytes != expectedWasted {
+		t.Errorf("WastedBytes = %d, want %d", stats.WastedBytes, expectedWasted)
+	}
+}
