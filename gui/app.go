@@ -684,7 +684,7 @@ func playFile(state *AppState, path string, onComplete func()) {
 	state.PlayingPath = path
 	state.StopPlayer = func() {
 		if cmd.Process != nil {
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 		}
 		if onComplete != nil {
 			onComplete()
@@ -692,7 +692,7 @@ func playFile(state *AppState, path string, onComplete func()) {
 	}
 
 	go func() {
-		cmd.Run()
+		_ = cmd.Run()
 		if state.CurrentPlayer == cmd {
 			state.CurrentPlayer = nil
 			state.StopPlayer = nil

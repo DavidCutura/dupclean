@@ -51,13 +51,8 @@ func Run(groups []scanner.DuplicateGroup, stats scanner.ScanStats) {
 	reader := bufio.NewReader(os.Stdin)
 	deletedCount := 0
 	var freedBytes int64
-	skipAllRemaining := false
 
 	for i, group := range groups {
-		if skipAllRemaining {
-			break
-		}
-
 		fmt.Printf("\n%s%s", colorCyan, strings.Repeat("─", 70))
 		fmt.Printf("%s\n", colorReset)
 		fmt.Printf("%s Group %d of %d%s%s • identical audio content • %s%s each%s\n",
@@ -97,14 +92,15 @@ func Run(groups []scanner.DuplicateGroup, stats scanner.ScanStats) {
 		switch input {
 		case "q", "quit":
 			fmt.Printf("\n%s⏹ Stopped early.%s You can resume later.\n\n", colorYellow+colorBold, colorReset)
-			goto done
+			printFinalSummary(deletedCount, freedBytes)
+			return
 		case "s", "skip", "":
 			fmt.Printf("  %s↷ Skipped this group%s\n", colorGray, colorReset)
 			continue
 		case "a":
 			fmt.Printf("\n%s↷ Skipping all remaining groups.%s\n", colorGray+colorBold, colorReset)
-			skipAllRemaining = true
-			goto done
+			printFinalSummary(deletedCount, freedBytes)
+			return
 		default:
 			choice, err := strconv.Atoi(input)
 			if err != nil || choice < 1 || choice > len(files) {
@@ -130,7 +126,6 @@ func Run(groups []scanner.DuplicateGroup, stats scanner.ScanStats) {
 		}
 	}
 
-done:
 	printFinalSummary(deletedCount, freedBytes)
 }
 
