@@ -22,32 +22,23 @@ DupClean hashes file *contents* — not names — so it catches every duplicate 
 
 ## Installation
 
-### macOS
+### Full Version (with GUI)
 
-**Option 1: DMG (Recommended)**
+**macOS**
 1. Download `dupclean.dmg` from [Releases](https://github.com/PopolQue/dupclean/releases)
 2. Double-click to mount
 3. Drag `DupClean.app` to Applications
-
-**Option 2: Binary**
-```bash
-tar -xzf dupclean-darwin-arm64.tar.gz
-sudo mv dupclean /usr/local/bin/
-```
-
-**Option 3: Homebrew**
-```bash
-# Coming soon
-```
 
 If your Mac warns you that the file is damaged, try removing the quarantine after installing:
 ```bash
 sudo xattr -d com.apple.quarantine /Applications/DupClean.app
 ```
----
 
-### Linux
+**Windows**
+1. Download `dupclean-windows-amd64.zip` from [Releases](https://github.com/PopolQue/dupclean/releases)
+2. Extract and run `dupclean.exe`
 
+**Linux**
 ```bash
 tar -xzf dupclean-linux-amd64.tar.gz
 sudo mv dupclean /usr/local/bin/
@@ -60,22 +51,25 @@ sudo mv dupclean /usr/local/bin/
 
 ---
 
-### Windows
+### CLI Version (Homebrew)
 
-Download and extract the `.zip` from [Releases](https://github.com/PopolQue/dupclean/releases), then run `dupclean.exe` directly or double-click in File Explorer.
+**macOS & Linux**
+```bash
+coming soon
+```
 
 ---
 
 ## Usage
 
-### GUI Mode
+**Launch GUI:**
+```bash
+dupclean --gui
+```
 
-Launch without arguments to open the graphical interface:
-
+**Launch CLI:**
 ```bash
 dupclean
-# or explicitly
-dupclean --gui
 ```
 
 **Workflow:**
@@ -87,28 +81,19 @@ dupclean --gui
 
 ---
 
-### CLI Mode
-
-```bash
-# Scan a folder for duplicate audio files
-dupclean ~/Music/Samples
-
-# Also scan non-audio files
-dupclean ~/Music/Samples --all
-
-# Show help
-dupclean --help
-```
-
----
-
 ## How it works
 
-1. **Walks** your folder recursively (skips hidden files/folders)
-2. **Pre-filters** by file size — only files sharing the same size could be duplicates
-3. **SHA-256 hashes** the content of those candidates (fast: skips unique-size files entirely)
-4. **Groups** files with matching hashes and presents them
-5. **Keeps** your chosen file and moves duplicates to Trash (safe — nothing is permanently deleted)
+DupClean uses a **4-stage multi-pass algorithm** for maximum speed and accuracy:
+
+1. **Size Pre-Filter** — Groups files by size 
+2. **Partial Hash** — Hashes first 8KB of potential matches 
+3. **Full SHA-256 Hash** — Hashes entire file content for exact matches
+4. **Byte Comparison** — Final verification to guarantee 100% accuracy
+
+This approach is fast because:
+- Files with unique sizes are never hashed
+- Files with different content at the start are rejected after 8KB
+- Only likely duplicates undergo full hashing and verification
 
 ---
 
@@ -138,7 +123,7 @@ Then choose which copy to **keep** (others go to Trash), or **skip** the group.
   Keep which file? (1-2)  [s]kip  [a]ll skip  [q]uit
   > 1
   ✓ Keeping: kick_drum_01.wav
-  🗑  Trashed: Kick Hard v2 FINAL.wav
+  x Trashed: Kick Hard v2 FINAL.wav
 ```
 
 **Controls:**

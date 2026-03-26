@@ -1,7 +1,7 @@
-//go:build !gui
-// +build !gui
+//go:build gui
+// +build gui
 
-// CLI-only build (default) - used by Homebrew
+// Full build with GUI - used for GitHub Releases
 package main
 
 import (
@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"dupclean/gui"
 	"dupclean/scanner"
 	"dupclean/ui"
 )
@@ -22,21 +23,14 @@ const (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		printHelp()
-		os.Exit(0)
+	if len(os.Args) < 2 || os.Args[1] == flagGUI || os.Args[1] == flagGUIAlt {
+		gui.RunGUI()
+		return
 	}
 
 	if os.Args[1] == flagHelp || os.Args[1] == flagHelpAlt {
 		printHelp()
 		os.Exit(0)
-	}
-
-	if os.Args[1] == flagGUI || os.Args[1] == flagGUIAlt {
-		fmt.Println("Error: GUI mode is not available in this build.")
-		fmt.Println("Please download the full version with GUI from:")
-		fmt.Println("https://github.com/PopolQue/dupclean/releases")
-		os.Exit(1)
 	}
 
 	folder := os.Args[1]
@@ -77,15 +71,13 @@ func main() {
 }
 
 func printHelp() {
-	fmt.Println("DupClean — Duplicate File Cleaner (CLI)")
+	fmt.Println("DupClean — Duplicate File Cleaner")
 	fmt.Println()
 	fmt.Println("Usage:")
-	fmt.Println("  dupclean <folder>           Scan folder for duplicates")
-	fmt.Println("  dupclean <folder> --all     Scan all files (not just audio)")
-	fmt.Println("  dupclean --gui              Launch GUI (not available in CLI build)")
-	fmt.Println("  dupclean --help             Show this help")
+	fmt.Println("  dupclean              Launch GUI")
+	fmt.Println("  dupclean --gui        Launch GUI (same as above)")
+	fmt.Println("  dupclean <folder>     Scan folder in CLI mode")
+	fmt.Println("  dupclean <folder> --all   Scan all files (not just audio)")
 	fmt.Println()
 	fmt.Println("Supported audio formats: .wav, .aiff, .aif, .mp3, .flac, .ogg, .m4a, .aac")
-	fmt.Println()
-	fmt.Println("Full version with GUI: https://github.com/PopolQue/dupclean/releases")
 }

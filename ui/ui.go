@@ -60,7 +60,7 @@ func Run(groups []scanner.DuplicateGroup, stats scanner.ScanStats) {
 
 		fmt.Printf("\n%s%s", colorCyan, strings.Repeat("─", 70))
 		fmt.Printf("%s\n", colorReset)
-		fmt.Printf("%s Group %d of %d%s  %s• identical audio content •  %s%s each%s\n",
+		fmt.Printf("%s Group %d of %d%s%s • identical audio content • %s%s each%s\n",
 			colorBold+colorWhite, i+1, len(groups), colorReset,
 			colorGray, colorDim, formatBytes(group.Files[0].Size), colorReset)
 		fmt.Printf("%s%s%s\n", colorCyan, strings.Repeat("─", 70), colorReset)
@@ -85,18 +85,18 @@ func Run(groups []scanner.DuplicateGroup, stats scanner.ScanStats) {
 		}
 
 		fmt.Printf("\n%s  Keep which file?%s\n", colorBold, colorReset)
-		fmt.Printf("  %s[1-%d]%s Keep that file, delete others\n", colorYellow, len(files), colorReset)
-		fmt.Printf("  %s[s]%s Skip this group\n", colorYellow, colorReset)
-		fmt.Printf("  %s[a]%s Skip all remaining groups\n", colorYellow, colorReset)
-		fmt.Printf("  %s[q]%s Quit\n", colorYellow, colorReset)
-		fmt.Printf("\n  %s>%s ", colorCyan, colorReset)
+		fmt.Printf(" %s[1-%d]%s Keep that file, delete others\n", colorYellow, len(files), colorReset)
+		fmt.Printf(" %s[s]%s Skip this group\n", colorYellow, colorReset)
+		fmt.Printf(" %s[a]%s Skip all remaining groups\n", colorYellow, colorReset)
+		fmt.Printf(" %s[q]%s Quit\n", colorYellow, colorReset)
+		fmt.Printf("\n %s>%s ", colorCyan, colorReset)
 
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(strings.ToLower(input))
 
 		switch input {
 		case "q", "quit":
-			fmt.Printf("\n%s⏹  Stopped early.%s You can resume later.\n\n", colorYellow+colorBold, colorReset)
+			fmt.Printf("\n%s⏹ Stopped early.%s You can resume later.\n\n", colorYellow+colorBold, colorReset)
 			goto done
 		case "s", "skip", "":
 			fmt.Printf("  %s↷ Skipped this group%s\n", colorGray, colorReset)
@@ -108,21 +108,21 @@ func Run(groups []scanner.DuplicateGroup, stats scanner.ScanStats) {
 		default:
 			choice, err := strconv.Atoi(input)
 			if err != nil || choice < 1 || choice > len(files) {
-				fmt.Printf("  %s Invalid choice. Please enter a number between 1 and %d.%s\n", colorYellow, len(files), colorReset)
+				fmt.Printf(" %s Invalid choice. Please enter a number between 1 and %d.%s\n", colorYellow, len(files), colorReset)
 				continue
 			}
 
 			keepFile := files[choice-1]
-			fmt.Printf("\n  %s✓ Keeping:%s %s%s%s\n", colorGreen+colorBold, colorReset, colorWhite, keepFile.Name, colorReset)
+			fmt.Printf("\n  %s ✓ Keeping:%s %s%s%s\n", colorGreen+colorBold, colorReset, colorWhite, keepFile.Name, colorReset)
 
 			for idx, f := range files {
 				if idx == choice-1 {
 					continue
 				}
 				if err := moveToTrash(f.Path); err != nil {
-					fmt.Printf("  %s Could not delete %s: %v%s\n", colorRed, f.Name, err, colorReset)
+					fmt.Printf(" %s Could not delete %s: %v%s\n", colorRed, f.Name, err, colorReset)
 				} else {
-					fmt.Printf("  %s Deleted:%s %s%s%s\n", colorRed, colorReset, colorGray, f.Name, colorReset)
+					fmt.Printf(" %s Deleted:%s %s%s%s\n", colorRed, colorReset, colorGray, f.Name, colorReset)
 					deletedCount++
 					freedBytes += f.Size
 				}
