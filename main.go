@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"dupclean/cleaner"
 	"dupclean/diskanalyzer"
 	"dupclean/scanner"
 	"dupclean/ui"
@@ -47,6 +49,10 @@ func main() {
 	// Check for subcommands
 	if os.Args[1] == "analyze" {
 		runAnalyze(os.Args[2:])
+		return
+	}
+	if os.Args[1] == "clean" {
+		runClean(os.Args[2:])
 		return
 	}
 
@@ -275,4 +281,88 @@ func printAnalyzeHelp() {
 	fmt.Println("  dupclean analyze ~/Documents --top=50 --by-type")
 	fmt.Println("  dupclean analyze ~/Photos --older-than=365 --min-size=10")
 	fmt.Println("  dupclean analyze / --json > disk-usage.json")
+}
+
+func runClean(args []string) {
+	// Parse flags
+	opts := cleaner.ScanOptions{}
+	cliOpts := cleaner.CLIOptions{}
+	var category string
+	var targetIDs []string
+	var noDeveloper, noBrowser bool
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "--") {
+			switch {
+			case arg == "--dry-run":
+				cliOpts.DryRun = true
+			case arg == "--permanent":
+				cliOpts.Permanent = true
+			case arg == "--yes":
+				cliOpts.Yes = true
+			case arg == "--no-developer":
+				noDeveloper = true
+			case arg == "--no-browser":
+				noBrowser = true
+			case strings.HasPrefix(arg, "--category="):
+				category = strings.TrimPrefix(arg, "--category=")
+			case strings.HasPrefix(arg, "--target="):
+				targetIDs = append(targetIDs, strings.TrimPrefix(arg, "--target="))
+			case strings.HasPrefix(arg, "--min-age="):
+				duration, _ := time.ParseDuration(strings.TrimPrefix(arg, "--min-age="))
+				opts.MinAge = duration
+			case strings.HasPrefix(arg, "--workers="):
+				opts.Concurrency, _ = strconv.Atoi(strings.TrimPrefix(arg, "--workers="))
+			case arg == "--help":
+				printCleanHelp()
+				os.Exit(0)
+			}
+		}
+	}
+
+	// Get targets
+	targets := cleaner.Registry()
+	targets = cleaner.FilterTargets(targets, category, targetIDs, noDeveloper, noBrowser)
+
+	if len(targets) == 0 {
+		fmt.Println("No cleanable targets found for the specified filters.")
+		return
+	}
+
+	// Scan
+	fmt.Println("Scanning...")
+	result, err := cleaner.Scan(targets, opts)
+	if err != nil {
+		fmt.Printf("Error during scan: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Render CLI
+	cleaner.RenderCLI(result, cliOpts)
+}
+
+func printCleanHelp() {
+	fmt.Println("DupClean — Cache & Temp Cleaner")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  dupclean clean [options]")
+	fmt.Println()
+	fmt.Println("Options:")
+	fmt.Println("  --category=CATEGORY   Only scan targets in this category (system|browser|developer|logs)")
+	fmt.Println("  --target=ID           Only scan this specific target ID (repeatable)")
+	fmt.Println("  --min-age=DURATION    Only include files older than this (e.g. 24h, 7d)")
+	fmt.Println("  --permanent           Delete permanently instead of moving to Trash")
+	fmt.Println("  --dry-run             Show what would be deleted without deleting anything")
+	fmt.Println("  --yes                 Skip interactive confirmation (use with --target for scripting)")
+	fmt.Println("  --no-developer        Exclude developer tool caches from scan")
+	fmt.Println("  --no-browser          Exclude browser caches from scan")
+	fmt.Println("  --workers=N           Number of concurrent workers (default: CPU count)")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  dupclean clean")
+	fmt.Println("  dupclean clean --category=system")
+	fmt.Println("  dupclean clean --target=macos-user-cache --target=linux-user-cache")
+	fmt.Println("  dupclean clean --dry-run")
+	fmt.Println("  dupclean clean --permanent --yes --target=dev-xcode-derived")
 }

@@ -1,0 +1,187 @@
+package cleaner
+
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"dupclean/internal/fsutil"
+)
+
+// ScanOptions configures how scanning is performed.
+type ScanOptions struct {
+	Concurrency  int           // worker pool size; 0 = runtime.NumCPU()
+	MinAge       time.Duration // skip files newer than this (default: 0 = all files)
+	MaxSize      int64         // cap entries reported per target (0 = unlimited)
+	SkipPatterns []string      // additional glob exclusions
+	OnProgress   func(Progress) // progress callback
+}
+
+// Progress holds scanning progress information.
+type Progress struct {
+	Total   int    // total targets
+	Done    int    // targets fully scanned
+	Current string // label of target currently being scanned
+}
+
+// Scan scans all targets concurrently and returns results.
+func Scan(targets []*CleanTarget, opts ScanOptions) (*ScanResult, error) {
+	if opts.Concurrency <= 0 {
+		opts.Concurrency = runtime.NumCPU()
+	}
+
+	result := &ScanResult{
+		Targets:   targets,
+		ScannedAt: time.Now(),
+		Errors:    make([]ScanError, 0),
+	}
+
+	// Filter targets with non-existent paths
+	validTargets := make([]*CleanTarget, 0)
+	for _, t := range targets {
+		hasValidPath := false
+		for _, p := range t.Paths {
+			if _, err := os.Stat(p); err == nil {
+				hasValidPath = true
+				break
+			}
+		}
+		if hasValidPath {
+			validTargets = append(validTargets, t)
+		}
+	}
+	targets = validTargets
+
+	// Progress tracking
+	var done atomic.Int32
+	var currentTarget atomic.Value
+
+	// Worker pool
+	jobs := make(chan *CleanTarget, len(targets))
+	results := make(chan *CleanTarget, len(targets))
+
+	var wg sync.WaitGroup
+	for i := 0; i < opts.Concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for target := range jobs {
+				scanTarget(target, opts)
+				results <- target
+				done.Add(1)
+				if opts.OnProgress != nil {
+					opts.OnProgress(Progress{
+						Total:   len(targets),
+						Done:    int(done.Load()),
+						Current: currentTarget.Load().(string),
+					})
+				}
+			}
+		}()
+	}
+
+	// Feed jobs
+	for _, t := range targets {
+		currentTarget.Store(t.Label)
+		jobs <- t
+	}
+	close(jobs)
+
+	// Collect results
+	wg.Wait()
+	close(results)
+
+	for t := range results {
+		result.TotalSize += t.TotalSize
+	}
+
+	return result, nil
+}
+
+// scanTarget scans a single target and populates its fields.
+func scanTarget(target *CleanTarget, opts ScanOptions) {
+	target.TotalSize = 0
+	target.FileCount = 0
+	target.Entries = make([]EntryInfo, 0)
+
+	for _, path := range target.Paths {
+		if _, err := os.Stat(path); err != nil {
+			continue // skip non-existent paths
+		}
+
+		// Use fsutil to measure
+		measureResult, err := fsutil.MeasureDir(path, target.Patterns, opts.MinAge)
+		if err != nil {
+			continue
+		}
+
+		target.TotalSize += measureResult.TotalSize
+		target.FileCount += measureResult.FileCount
+
+		// Convert fsutil.EntryInfo to cleaner.EntryInfo
+		for _, e := range measureResult.Entries {
+			target.Entries = append(target.Entries, EntryInfo{
+				Path:    e.Path,
+				Size:    e.Size,
+				ModTime: e.ModTime,
+				IsDir:   e.IsDir,
+			})
+		}
+	}
+
+	target.ScannedAt = time.Now()
+}
+
+// FilterTargets filters targets by category and IDs.
+func FilterTargets(targets []*CleanTarget, category string, ids []string, noDeveloper, noBrowser bool) []*CleanTarget {
+	if len(ids) > 0 {
+		// Filter by specific IDs
+		filtered := make([]*CleanTarget, 0)
+		idMap := make(map[string]bool)
+		for _, id := range ids {
+			idMap[id] = true
+		}
+		for _, t := range targets {
+			if idMap[t.ID] {
+				filtered = append(filtered, t)
+			}
+		}
+		return filtered
+	}
+
+	filtered := make([]*CleanTarget, 0)
+	for _, t := range targets {
+		// Skip excluded categories
+		if noDeveloper && t.Category == "Developer" {
+			continue
+		}
+		if noBrowser && t.Category == "Browser" {
+			continue
+		}
+
+		// Filter by category if specified
+		if category != "" && t.Category != category {
+			continue
+		}
+
+		filtered = append(filtered, t)
+	}
+
+	return filtered
+}
+
+// GetTargetByPath finds the target that contains a given path.
+func GetTargetByPath(targets []*CleanTarget, path string) *CleanTarget {
+	for _, t := range targets {
+		for _, p := range t.Paths {
+			if rel, err := filepath.Rel(p, path); err == nil && !strings.HasPrefix(rel, "..") {
+				return t
+			}
+		}
+	}
+	return nil
+}
