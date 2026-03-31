@@ -20,9 +20,9 @@ type DeleteOptions struct {
 
 // DeleteResult holds the result of a delete operation.
 type DeleteResult struct {
-	Deleted    int          // number of files/dirs deleted
-	FreedBytes int64        // total bytes freed
-	Skipped    int          // files that were open or permission-denied
+	Deleted    int   // number of files/dirs deleted
+	FreedBytes int64 // total bytes freed
+	Skipped    int   // files that were open or permission-denied
 	Errors     []DeleteError
 }
 

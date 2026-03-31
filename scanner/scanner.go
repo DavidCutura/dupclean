@@ -207,7 +207,7 @@ func FindDuplicates(folder string, includeAll bool, onProgress func(ScanProgress
 	} else {
 		scanner = NewAudioScanner()
 	}
-	
+
 	opts := Options{
 		IncludeHidden:    false,
 		MinSize:          0,

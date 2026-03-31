@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-
-	
 )
 
 // getSystemTargets returns OS-specific system cache and temp targets.

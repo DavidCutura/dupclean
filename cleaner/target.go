@@ -8,10 +8,10 @@ import (
 type Risk uint8
 
 const (
-	RiskSafe Risk = iota // always safe: OS temp dirs, browser caches
-	RiskLow              // safe for most users: app caches, log files
-	RiskModerate         // may cause slowdowns on next launch: large app caches
-	RiskHigh             // use caution: system-level files, package caches
+	RiskSafe     Risk = iota // always safe: OS temp dirs, browser caches
+	RiskLow                  // safe for most users: app caches, log files
+	RiskModerate             // may cause slowdowns on next launch: large app caches
+	RiskHigh                 // use caution: system-level files, package caches
 )
 
 // CleanTarget is a single cleanable location.
@@ -26,17 +26,17 @@ type CleanTarget struct {
 	OS          string // "darwin", "linux", "windows", or "" for all
 
 	// populated after Scan():
-	TotalSize   int64
-	FileCount   int
-	ScannedAt   time.Time
-	Entries     []EntryInfo // individual files/dirs found
-	Selected    bool        // for CLI/GUI selection state
+	TotalSize int64
+	FileCount int
+	ScannedAt time.Time
+	Entries   []EntryInfo // individual files/dirs found
+	Selected  bool        // for CLI/GUI selection state
 }
 
 // EntryInfo is one file or directory within a target.
 type EntryInfo struct {
 	Path    string
-	Size    int64     // for dirs: recursive sum
+	Size    int64 // for dirs: recursive sum
 	ModTime time.Time
 	IsDir   bool
 }

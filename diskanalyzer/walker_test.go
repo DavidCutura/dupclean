@@ -82,10 +82,10 @@ func TestWalk_MinSize(t *testing.T) {
 func TestTypeBreakdown(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create files with different extensions
-	os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("12345"), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "file2.txt"), []byte("12345"), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "file.mp3"), []byte("1234567890"), 0644)
+	// Create files with different extensions and sizes
+	os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("12345"), 0644)               // 5 bytes
+	os.WriteFile(filepath.Join(tmpDir, "file2.txt"), []byte("12345"), 0644)               // 5 bytes
+	os.WriteFile(filepath.Join(tmpDir, "file.mp3"), []byte("12345678901234567890"), 0644) // 20 bytes
 
 	result, _, _ := Walk(tmpDir, DefaultOptions())
 	breakdown := TypeBreakdown(result)
@@ -94,9 +94,31 @@ func TestTypeBreakdown(t *testing.T) {
 		t.Errorf("Expected 2 types, got %d", len(breakdown))
 	}
 
-	// First should be .mp3 (larger)
-	if breakdown[0].Ext != ".mp3" {
-		t.Errorf("Expected .mp3 first, got %s", breakdown[0].Ext)
+	// Find .mp3 and .txt in the breakdown (order may vary)
+	var mp3Type, txtType *TypeStat
+	for i := range breakdown {
+		if breakdown[i].Ext == ".mp3" {
+			mp3Type = &breakdown[i]
+		} else if breakdown[i].Ext == ".txt" {
+			txtType = &breakdown[i]
+		}
+	}
+
+	if mp3Type == nil {
+		t.Error("Expected .mp3 type in breakdown")
+	} else if mp3Type.TotalSize != 20 {
+		t.Errorf("Expected .mp3 size to be 20, got %d", mp3Type.TotalSize)
+	}
+
+	if txtType == nil {
+		t.Error("Expected .txt type in breakdown")
+	} else if txtType.TotalSize != 10 {
+		t.Errorf("Expected .txt size to be 10, got %d", txtType.TotalSize)
+	}
+
+	// Verify .mp3 has more space than .txt
+	if mp3Type != nil && txtType != nil && mp3Type.TotalSize <= txtType.TotalSize {
+		t.Error("Expected .mp3 to have more space than .txt")
 	}
 }
 

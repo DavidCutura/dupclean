@@ -15,8 +15,8 @@ type FileInfo struct {
 
 // DuplicateGroup represents a set of files with identical or similar content
 type DuplicateGroup struct {
-	Hash     string
-	Files    []FileInfo
+	Hash       string
+	Files      []FileInfo
 	Similarity int // 100 for exact matches, <100 for similar (photos)
 }
 

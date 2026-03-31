@@ -14,10 +14,10 @@ import (
 
 // ScanOptions configures how scanning is performed.
 type ScanOptions struct {
-	Concurrency  int           // worker pool size; 0 = runtime.NumCPU()
-	MinAge       time.Duration // skip files newer than this (default: 0 = all files)
-	MaxSize      int64         // cap entries reported per target (0 = unlimited)
-	SkipPatterns []string      // additional glob exclusions
+	Concurrency  int            // worker pool size; 0 = runtime.NumCPU()
+	MinAge       time.Duration  // skip files newer than this (default: 0 = all files)
+	MaxSize      int64          // cap entries reported per target (0 = unlimited)
+	SkipPatterns []string       // additional glob exclusions
 	OnProgress   func(Progress) // progress callback
 }
 
@@ -72,7 +72,7 @@ func Scan(targets []*CleanTarget, opts ScanOptions) (*ScanResult, error) {
 			for target := range jobs {
 				scanTarget(target, opts)
 				done.Add(1)
-				
+
 				// Send progress BEFORE sending result to avoid blocking
 				if opts.OnProgress != nil {
 					current := currentTarget.Load()
@@ -85,7 +85,7 @@ func Scan(targets []*CleanTarget, opts ScanOptions) (*ScanResult, error) {
 						Current: current.(string),
 					})
 				}
-				
+
 				results <- target
 			}
 		}()

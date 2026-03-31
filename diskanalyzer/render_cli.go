@@ -7,11 +7,11 @@ import (
 
 // CLIOptions configures the CLI renderer output.
 type CLIOptions struct {
-	TopN      int  // Show N largest files (0 = don't show)
-	ByType    bool // Show type breakdown instead of tree
-	OlderThan int  // Show files older than N days (0 = don't show)
+	TopN      int   // Show N largest files (0 = don't show)
+	ByType    bool  // Show type breakdown instead of tree
+	OlderThan int   // Show files older than N days (0 = don't show)
 	MinSize   int64 // Minimum file size for old files query
-	Depth     int  // Tree depth (default: 2)
+	Depth     int   // Tree depth (default: 2)
 }
 
 // RenderCLI renders the AnalysisResult to stdout.
@@ -54,8 +54,8 @@ func renderTree(node *DirNode, depth int, maxDepth int, totalSize int64) {
 
 	// Combine files and children for sorting
 	allItems := make([]struct {
-		name string
-		size int64
+		name  string
+		size  int64
 		isDir bool
 	}, 0, len(node.Files)+len(node.Children))
 

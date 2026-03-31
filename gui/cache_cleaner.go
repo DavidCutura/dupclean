@@ -21,7 +21,7 @@ import (
 // CacheCleanerState holds the state for the cache cleaner widget
 type CacheCleanerState struct {
 	Window                 fyne.Window
-	ContentContainer       *fyne.Container  // Reference to content area
+	ContentContainer       *fyne.Container // Reference to content area
 	Targets                []*cleaner.CleanTarget
 	SelectedTargets        map[string]bool
 	TotalSize              int64
@@ -150,7 +150,7 @@ func startCacheScan(state *CacheCleanerState) {
 					cleanPaths = append(cleanPaths, path)
 				}
 			}
-			
+
 			// Only include target if it has cleanable paths
 			if len(cleanPaths) > 0 {
 				t.Paths = cleanPaths
@@ -376,7 +376,7 @@ func isProtectedPath(path string) bool {
 		"/System",
 		"/Library/Caches/com.apple",
 	}
-	
+
 	for _, p := range protected {
 		if len(path) >= len(p) && path[:len(p)] == p {
 			return true
@@ -418,9 +418,9 @@ func cleanPath(basePath string, patterns []string) (int, int64, error) {
 		if err != nil {
 			log.Printf("[CacheCleaner] Error measuring %s: %v", basePath, err)
 		}
-		
+
 		log.Printf("[CacheCleaner] Measured %s (%d files) in %s", formatBytes(measuredBytes), measuredCount, basePath)
-		
+
 		// Now actually delete everything
 		if err := os.RemoveAll(basePath); err != nil {
 			log.Printf("[CacheCleaner] Error deleting %s: %v", basePath, err)
@@ -431,7 +431,7 @@ func cleanPath(basePath string, patterns []string) (int, int64, error) {
 			log.Printf("[CacheCleaner] Error recreating %s: %v", basePath, err)
 			return measuredCount, measuredBytes, err
 		}
-		
+
 		log.Printf("[CacheCleaner] Deleted %s from %s", formatBytes(measuredBytes), basePath)
 		return measuredCount, measuredBytes, nil
 	}

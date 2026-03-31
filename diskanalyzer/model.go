@@ -14,9 +14,9 @@ type FileEntry struct {
 // DirNode represents a directory in the tree.
 // TotalSize is the recursive sum of all descendant file sizes.
 type DirNode struct {
-	Name      string     `json:"name"`
-	Path      string     `json:"path"`
-	TotalSize int64      `json:"total_size"`
+	Name      string      `json:"name"`
+	Path      string      `json:"path"`
+	TotalSize int64       `json:"total_size"`
 	Files     []FileEntry `json:"files"`
 	Children  []*DirNode  `json:"children"`
 	Parent    *DirNode    `json:"-"` // nil for root, excluded from JSON
@@ -25,7 +25,7 @@ type DirNode struct {
 // AnalysisResult is the complete output of a Walk call.
 type AnalysisResult struct {
 	Root          *DirNode         `json:"root"`
-	AllFiles      []FileEntry      `json:"all_files"`       // flat, sorted by size desc
+	AllFiles      []FileEntry      `json:"all_files"` // flat, sorted by size desc
 	TotalSize     int64            `json:"total_size"`
 	FileCount     int              `json:"file_count"`
 	TypeBreakdown map[string]int64 `json:"type_breakdown"` // ext → total bytes

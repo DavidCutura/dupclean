@@ -33,7 +33,7 @@ func init() {
 
 type AppState struct {
 	Window             fyne.Window
-	ContentContainer   *fyne.Container  // Reference to content area (preserves sidebar)
+	ContentContainer   *fyne.Container // Reference to content area (preserves sidebar)
 	FolderPath         string
 	ScanAll            bool
 	IsScanning         bool

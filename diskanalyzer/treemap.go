@@ -247,13 +247,13 @@ func LayoutTreemap(root *DirNode, bounds Rect, maxDepth int) []LayoutNode {
 // ColorPalette returns a color for a node based on depth.
 func ColorPalette(depth int) (r, g, b uint8) {
 	colors := []struct{ r, g, b uint8 }{
-		{66, 133, 244},  // Blue
-		{234, 67, 53},   // Red
-		{251, 188, 5},   // Yellow
-		{52, 168, 83},   // Green
-		{155, 89, 182},  // Purple
-		{26, 188, 156},  // Teal
-		{230, 126, 34},  // Orange
+		{66, 133, 244}, // Blue
+		{234, 67, 53},  // Red
+		{251, 188, 5},  // Yellow
+		{52, 168, 83},  // Green
+		{155, 89, 182}, // Purple
+		{26, 188, 156}, // Teal
+		{230, 126, 34}, // Orange
 	}
 
 	c := colors[depth%len(colors)]
