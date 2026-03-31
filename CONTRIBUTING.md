@@ -6,7 +6,7 @@ Thank you for considering contributing to DupClean! Here are the guidelines to f
 
 ### Prerequisites
 
-- Go 1.22 or later
+- Go 1.25 or later
 - Git
 - Make (optional, but recommended)
 
