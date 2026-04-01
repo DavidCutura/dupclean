@@ -1,6 +1,7 @@
 version: "2"
 
 linters:
+  default: none
   enable:
     - errcheck
     - gofmt
@@ -10,15 +11,18 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+  settings:
+    goimports:
+      local-prefixes: dupclean
+  exclusions:
+    rules:
+      - path: '(.+)_test\.go'
+        linters:
+          - errcheck
 
-settings:
-  gofmt:
-    simplify: true
-  goimports:
-    local-prefixes: dupclean
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
+formatters:
+  enable:
+    - gofmt
+  settings:
+    gofmt:
+      simplify: true
