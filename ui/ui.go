@@ -150,7 +150,7 @@ func printHeader() {
 	fmt.Print(colorReset)
 	fmt.Println()
 	fmt.Printf("%s╔═══════════════════════════════════════════════════════╗%s\n", colorPurple+colorBold, colorReset)
-	fmt.Printf("%s║%s  %sDUPCLEAN%s  — Duplicate File Hunter                    %s║%s\n",
+	fmt.Printf("%s║%s       %sDUPCLEAN%s  — Duplicate File Hunter               %s║%s\n",
 		colorPurple, colorReset, colorBold+colorWhite, colorReset, colorPurple, colorReset)
 	fmt.Printf("%s╚═══════════════════════════════════════════════════════╝%s\n\n", colorPurple+colorBold, colorReset)
 }
