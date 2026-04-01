@@ -3,6 +3,7 @@ package diskanalyzer
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -149,6 +150,10 @@ func TestFindPathToRoot_NilNode(t *testing.T) {
 }
 
 func TestGetInode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("getInode is not supported on Windows")
+	}
+
 	tmpFile := filepath.Join(t.TempDir(), "test.txt")
 	if err := os.WriteFile(tmpFile, []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
