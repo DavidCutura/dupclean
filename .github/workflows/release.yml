@@ -72,12 +72,19 @@ jobs:
       if: matrix.goos == 'windows'
       run: Compress-Archive -Path ${{ matrix.artifact }} -DestinationPath ${{ matrix.artifact }}.zip
 
-    - name: Upload release asset
+    - name: Upload release asset (Unix)
+      if: matrix.goos != 'windows'
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          ${{ matrix.artifact }}.tar.gz
-          ${{ matrix.artifact }}.zip
+        files: ${{ matrix.artifact }}.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload release asset (Windows)
+      if: matrix.goos == 'windows'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{ matrix.artifact }}.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
