@@ -46,10 +46,13 @@ jobs:
         id: verify-changed-files
         with:
           files: README.md
+          safe_output: 'true'
 
 
       - name: Commit changes
         if: steps.verify-changed-files.outputs.files_changed == 'true'
+        env:
+          CHANGED_FILES: ${{ steps.verify-changed-files.outputs.files_changed }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
