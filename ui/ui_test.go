@@ -3,6 +3,7 @@ package ui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -133,6 +134,10 @@ func TestPrintFinalSummary_NoneDeleted(t *testing.T) {
 }
 
 func TestMoveToTrash(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("moveToTrash is only tested on macOS")
+	}
+
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
 
