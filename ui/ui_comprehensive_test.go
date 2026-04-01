@@ -146,7 +146,7 @@ func TestFormatBytes_Comprehensive(t *testing.T) {
 	}
 }
 
-func TestFormatBytes_EdgeCases(t *testing.T) {
+func TestFormatBytes_EdgeCasesComprehensive(t *testing.T) {
 	// Test negative values (should still produce output)
 	result := formatBytes(-1024)
 	if result == "" {

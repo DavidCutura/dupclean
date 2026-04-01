@@ -260,8 +260,7 @@ func TestGetTargetByPath(t *testing.T) {
 	target := GetTargetByPath(targets, "/test/path1")
 	if target == nil {
 		t.Error("Expected to find target")
-	}
-	if target.ID != "target1" {
+	} else if target.ID != "target1" {
 		t.Errorf("Expected target1, got %q", target.ID)
 	}
 
