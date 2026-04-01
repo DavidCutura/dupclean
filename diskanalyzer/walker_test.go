@@ -97,9 +97,10 @@ func TestTypeBreakdown(t *testing.T) {
 	// Find .mp3 and .txt in the breakdown (order may vary)
 	var mp3Type, txtType *TypeStat
 	for i := range breakdown {
-		if breakdown[i].Ext == ".mp3" {
+		switch breakdown[i].Ext {
+		case ".mp3":
 			mp3Type = &breakdown[i]
-		} else if breakdown[i].Ext == ".txt" {
+		case ".txt":
 			txtType = &breakdown[i]
 		}
 	}

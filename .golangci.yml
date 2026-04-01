@@ -4,16 +4,10 @@ linters:
   default: none
   enable:
     - errcheck
-    - gofmt
-    - goimports
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
-  settings:
-    goimports:
-      local-prefixes: dupclean
   exclusions:
     rules:
       - path: '(.+)_test\.go'
@@ -23,6 +17,4 @@ linters:
 formatters:
   enable:
     - gofmt
-  settings:
-    gofmt:
-      simplify: true
+    - goimports

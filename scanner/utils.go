@@ -16,7 +16,7 @@ func hashFilePartial(path string, size int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := sha256.New()
 	lr := io.LimitReader(f, size)
@@ -33,7 +33,7 @@ func hashFileFull(path string) (string, os.FileInfo, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	info, err := f.Stat()
 	if err != nil {
@@ -54,13 +54,13 @@ func filesIdentical(path1, path2 string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer f1.Close()
+	defer func() { _ = f1.Close() }()
 
 	f2, err := os.Open(path2)
 	if err != nil {
 		return false, err
 	}
-	defer f2.Close()
+	defer func() { _ = f2.Close() }()
 
 	const bufSize = 32 * 1024 // 32KB buffers
 	buf1 := make([]byte, bufSize)

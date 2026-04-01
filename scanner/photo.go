@@ -143,7 +143,7 @@ func computePerceptualHash(path string) (*goimagehash.ImageHash, os.FileInfo, er
 	if err != nil {
 		return nil, nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	info, err := f.Stat()
 	if err != nil {

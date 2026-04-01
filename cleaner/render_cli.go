@@ -47,9 +47,10 @@ func RenderCLI(result *ScanResult, opts CLIOptions) {
 		fmt.Printf("  %s\n", cat)
 		for _, t := range targets {
 			riskIcon := "✓"
-			if t.Risk == RiskModerate {
+			switch t.Risk {
+			case RiskModerate:
 				riskIcon = "⚠"
-			} else if t.Risk == RiskHigh {
+			case RiskHigh:
 				riskIcon = "✗"
 			}
 

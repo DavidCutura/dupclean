@@ -255,9 +255,10 @@ func displayCacheResults(state *CacheCleanerState, resultsContainer *fyne.Contai
 func createCacheTargetCard(state *CacheCleanerState, target *cleaner.CleanTarget, totalLabel *canvas.Text, cleanBtn *widget.Button) *widget.Card {
 	// Risk icon
 	riskIcon := theme.ConfirmIcon()
-	if target.Risk == cleaner.RiskModerate {
+	switch target.Risk {
+	case cleaner.RiskModerate:
 		riskIcon = theme.WarningIcon()
-	} else if target.Risk == cleaner.RiskHigh {
+	case cleaner.RiskHigh:
 		riskIcon = theme.ErrorIcon()
 	}
 
