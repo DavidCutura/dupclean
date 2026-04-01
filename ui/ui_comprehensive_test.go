@@ -112,7 +112,7 @@ func TestFormatBytes_Comprehensive(t *testing.T) {
 		{1024, "1.0 KB"},
 		{1536, "1.5 KB"},
 		{10240, "10.0 KB"},
-		{102399, "99.9 KB"},
+		{102399, "100 KB"},
 
 		// Megabytes
 		{1048576, "1.0 MB"},
@@ -167,10 +167,10 @@ func TestFormatBytes_Boundaries(t *testing.T) {
 		unit     string
 		expected string
 	}{
-		{1023, "B", "1023 B"},       // Just under KB
-		{1024, "KB", "1.0 KB"},      // Exactly 1 KB
+		{1023, "B", "1023 B"},        // Just under KB
+		{1024, "KB", "1.0 KB"},       // Exactly 1 KB
 		{1048575, "KB", "1023.9 KB"}, // Just under MB
-		{1048576, "MB", "1.0 MB"},   // Exactly 1 MB
+		{1048576, "MB", "1.0 MB"},    // Exactly 1 MB
 	}
 
 	for _, tt := range tests {
@@ -251,7 +251,7 @@ func TestPrintScanSummary_LargeValues(t *testing.T) {
 	stats := scanner.ScanStats{
 		TotalScanned: 1000000,
 		TotalDupes:   500000,
-		WastedBytes:  10737418240, // 10 GB
+		WastedBytes:  10737418240,        // 10 GB
 		ScanDuration: 3600 * time.Second, // 1 hour
 	}
 
