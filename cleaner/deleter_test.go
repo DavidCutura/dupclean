@@ -9,7 +9,7 @@ import (
 func TestDeleteEntry_Permanent(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
-	
+
 	// Create test file
 	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
@@ -62,7 +62,7 @@ func TestDeleteEntry_Permanent_NonExistent(t *testing.T) {
 func TestDeleteEntry_Trash(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
-	
+
 	// Create test file
 	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
@@ -85,12 +85,12 @@ func TestIsFileInUse(t *testing.T) {
 	if isFileInUse(nil) {
 		t.Error("nil error should not be considered as file in use")
 	}
-	
+
 	// Test with actual error strings
 	if !isFileInUse(&os.PathError{Op: "remove", Path: "test", Err: os.ErrPermission}) {
 		t.Log("Permission errors may be considered as file in use")
 	}
-	
+
 	// Test specific strings
 	testCases := []struct {
 		errStr   string
@@ -104,7 +104,7 @@ func TestIsFileInUse(t *testing.T) {
 		{"file not found", false},
 		{"", false},
 	}
-	
+
 	for _, tc := range testCases {
 		result := containsAny(tc.errStr, []string{"busy", "in use", "sharing violation", "permission denied", "access is denied"})
 		if result != tc.expected {
