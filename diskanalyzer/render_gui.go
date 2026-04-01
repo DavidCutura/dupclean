@@ -1,3 +1,5 @@
+//go:build gui
+
 package diskanalyzer
 
 import (
