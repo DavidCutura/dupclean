@@ -45,6 +45,12 @@ type Options struct {
 	// Use context.WithTimeout() or context.WithCancel() to limit scan duration.
 	Context context.Context
 
+	// StreamingThreshold enables memory-efficient streaming mode when > 0.
+	// When file count exceeds this threshold, files are processed in chunks
+	// to reduce memory pressure. Recommended: 10000-50000.
+	// Default: 0 (disabled, uses ByteScanner default)
+	StreamingThreshold int
+
 	// IncludeHidden scans hidden files and directories (default: false)
 	IncludeHidden bool
 
