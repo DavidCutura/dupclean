@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"dupclean/cleaner"
@@ -50,10 +51,14 @@ type AppState struct {
 	IgnoreExtensions   []string
 	PlayingPath        string
 	progressComponents *progressComponents
+	mu                 sync.RWMutex // Protects concurrent access to state
 }
 
 // updateContent updates the content container (preserves sidebar)
 func (state *AppState) updateContent(content fyne.CanvasObject) {
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	
 	if state.ContentContainer != nil {
 		state.ContentContainer.Objects = []fyne.CanvasObject{content}
 		state.ContentContainer.Refresh()
@@ -307,7 +312,9 @@ func createScanButton(state *AppState, folderCard, progressCard *widget.Card) *w
 }
 
 func startScan(state *AppState, _ *widget.Card, progressCard *widget.Card) {
+	state.mu.Lock()
 	state.IsScanning = true
+	state.mu.Unlock()
 
 	prog := state.progressComponents
 	prog.label.SetText("Scanning...")
@@ -322,9 +329,19 @@ func startScan(state *AppState, _ *widget.Card, progressCard *widget.Card) {
 				prog.status.SetText(progress.Phase)
 			})
 		}
-		groups, stats, err := scanner.FindDuplicates(state.FolderPath, state.ScanAll, progressCallback, state.IgnoreFolders, state.IgnoreExtensions)
+		
+		state.mu.RLock()
+		folderPath := state.FolderPath
+		scanAll := state.ScanAll
+		ignoreFolders := state.IgnoreFolders
+		ignoreExtensions := state.IgnoreExtensions
+		state.mu.RUnlock()
+		
+		groups, stats, err := scanner.FindDuplicates(folderPath, scanAll, progressCallback, ignoreFolders, ignoreExtensions)
 		if err != nil {
+			state.mu.Lock()
 			state.IsScanning = false
+			state.mu.Unlock()
 			fyne.Do(func() {
 				prog.label.SetText("Error")
 				prog.status.SetText(fmt.Sprintf("Scan failed: %v", err))
@@ -338,9 +355,11 @@ func startScan(state *AppState, _ *widget.Card, progressCard *widget.Card) {
 			prog.bar.SetValue(1)
 		})
 
+		state.mu.Lock()
 		state.Groups = groups
 		state.Stats = stats
 		state.IsScanning = false
+		state.mu.Unlock()
 
 		showResults(state, stats)
 	}()
@@ -610,15 +629,21 @@ func createFileCard(num int, f scanner.FileInfo, state *AppState) *widget.Card {
 
 func keepAndDelete(state *AppState, keepIndex int, files []scanner.FileInfo) {
 	stopPlayback(state)
+	
 	for idx, f := range files {
 		if idx == keepIndex {
 			continue
 		}
 		// Always count the deletion, even if moveToTrash fails (e.g., in tests)
+		state.mu.Lock()
 		state.DeletedCount++
 		state.FreedBytes += f.Size
+		state.mu.Unlock()
 		_ = moveToTrash(f.Path)
 	}
+	
+	state.mu.Lock()
+	defer state.mu.Unlock()
 
 	i := state.CurrentGroupIndex
 	state.Groups = append(state.Groups[:i], state.Groups[i+1:]...)
@@ -707,6 +732,7 @@ func playFile(state *AppState, path string, onComplete func()) {
 		return
 	}
 
+	state.mu.Lock()
 	state.CurrentPlayer = cmd
 	state.PlayingPath = path
 	state.StopPlayer = func() {
@@ -717,16 +743,19 @@ func playFile(state *AppState, path string, onComplete func()) {
 			onComplete()
 		}
 	}
+	state.mu.Unlock()
 
 	go func() {
 		_ = cmd.Run()
+		state.mu.Lock()
 		if state.CurrentPlayer == cmd {
 			state.CurrentPlayer = nil
 			state.StopPlayer = nil
 			state.PlayingPath = ""
-			if onComplete != nil {
-				onComplete()
-			}
+		}
+		state.mu.Unlock()
+		if onComplete != nil {
+			onComplete()
 		}
 	}()
 }
@@ -806,6 +835,9 @@ func showIgnoreDialog(state *AppState, onConfirm func()) {
 }
 
 func stopPlayback(state *AppState) {
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	
 	if state.StopPlayer != nil {
 		state.StopPlayer()
 		state.StopPlayer = nil
