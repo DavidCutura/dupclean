@@ -26,6 +26,7 @@ type ScanStats struct {
 	TotalDupes   int
 	WastedBytes  int64
 	ScanDuration time.Duration
+	Errors       []*ScanError // Errors encountered during scanning
 }
 
 // ScanProgress holds progress information during scanning

@@ -65,6 +65,7 @@ func (s *PhotoScanner) Scan(root string, opts Options) ([]DuplicateGroup, ScanSt
 		if err != nil {
 			// Log access errors for visibility
 			log.Printf("[PhotoScanner] Access error: %v", err)
+			stats.Errors = append(stats.Errors, NewSkippedError(path, ErrFileAccess, err))
 			return nil
 		}
 
@@ -133,6 +134,7 @@ func (s *PhotoScanner) Scan(root string, opts Options) ([]DuplicateGroup, ScanSt
 		if err != nil {
 			// Log files that can't be decoded
 			log.Printf("[PhotoScanner] Hash error for %s: %v", path, err)
+			stats.Errors = append(stats.Errors, NewScanError(path, ErrFileHash, err))
 			continue
 		}
 		hashed = append(hashed, hashedPhoto{
