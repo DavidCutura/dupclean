@@ -110,13 +110,15 @@ func (s *ByteScanner) Scan(root string, opts Options) ([]DuplicateGroup, ScanSta
 // detectDuplicates performs the multi-stage duplicate detection algorithm
 func (s *ByteScanner) detectDuplicates(bySize map[int64][]string, start time.Time, stats ScanStats) ([]DuplicateGroup, ScanStats, error) {
 	// Stage 2: Partial hash (first 8KB)
+	// Uses DefaultPartialHashSize for initial filtering - files with different
+	// partial hashes are guaranteed to be different
 	partialHashGroups := make(map[string][]string)
 	for _, paths := range bySize {
 		if len(paths) < 2 {
 			continue
 		}
 		for _, path := range paths {
-			partialHash, err := hashFilePartial(path, partialHashSize)
+			partialHash, err := hashFilePartial(path, DefaultPartialHashSize)
 			if err != nil {
 				log.Printf("[ByteScanner] Partial hash error for %s: %v", path, err)
 				stats.Errors = append(stats.Errors, NewScanError(path, ErrFileHash, err))
