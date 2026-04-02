@@ -7,3 +7,4 @@ dupclean
 .qwen/
 coverage.out
 coverage.txt
+docs/
