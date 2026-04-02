@@ -20,6 +20,9 @@ func (s *ByteScanner) Scan(root string, opts Options) ([]DuplicateGroup, ScanSta
 	start := time.Now()
 	stats := ScanStats{}
 
+	// Track visited inodes to avoid following symlinks and hard links
+	visitedInodes := make(map[uint64]bool)
+
 	// Stage 1: Collect files and group by size
 	bySize := make(map[int64][]string)
 
@@ -27,6 +30,12 @@ func (s *ByteScanner) Scan(root string, opts Options) ([]DuplicateGroup, ScanSta
 		if err != nil {
 			return nil // skip unreadable files
 		}
+
+		// Skip symlinks to prevent following malicious links
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+
 		if !opts.IncludeHidden && strings.HasPrefix(info.Name(), ".") {
 			if info.IsDir() {
 				return filepath.SkipDir
@@ -57,6 +66,14 @@ func (s *ByteScanner) Scan(root string, opts Options) ([]DuplicateGroup, ScanSta
 		// Apply minimum size filter
 		if info.Size() < opts.MinSize {
 			return nil
+		}
+
+		// Skip hard links using inode tracking
+		if inode, ok := getInode(info); ok {
+			if visitedInodes[inode] {
+				return nil // Already processed this inode
+			}
+			visitedInodes[inode] = true
 		}
 
 		bySize[info.Size()] = append(bySize[info.Size()], path)

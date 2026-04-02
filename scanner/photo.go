@@ -58,10 +58,18 @@ func (s *PhotoScanner) Scan(root string, opts Options) ([]DuplicateGroup, ScanSt
 
 	// Stage 1: Collect photo files
 	photos := make([]string, 0)
+	visitedInodes := make(map[uint64]bool)
+
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
+
+		// Skip symlinks to prevent following malicious links
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+
 		if !opts.IncludeHidden && strings.HasPrefix(info.Name(), ".") {
 			if info.IsDir() {
 				return filepath.SkipDir
@@ -97,6 +105,14 @@ func (s *PhotoScanner) Scan(root string, opts Options) ([]DuplicateGroup, ScanSt
 		// Apply minimum size filter
 		if info.Size() < opts.MinSize {
 			return nil
+		}
+
+		// Skip hard links using inode tracking
+		if inode, ok := getInode(info); ok {
+			if visitedInodes[inode] {
+				return nil // Already processed this inode
+			}
+			visitedInodes[inode] = true
 		}
 
 		photos = append(photos, path)
