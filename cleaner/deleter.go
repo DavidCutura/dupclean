@@ -1,7 +1,6 @@
 package cleaner
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -120,14 +119,9 @@ type deleteResult struct {
 
 // deleteEntry deletes a single entry.
 func deleteEntry(entry EntryInfo, permanent bool) (deleted int, freedBytes int64, skipped bool, err error) {
-	// Safety check: never delete empty paths
-	if entry.Path == "" {
-		return 0, 0, false, fmt.Errorf("cannot delete empty path")
-	}
-
-	// Safety check: never delete root directory
-	if entry.Path == "/" || entry.Path == `\` {
-		return 0, 0, false, fmt.Errorf("cannot delete root directory")
+	// Comprehensive path validation
+	if err := validateDeletePath(entry.Path); err != nil {
+		return 0, 0, false, err
 	}
 
 	if permanent {

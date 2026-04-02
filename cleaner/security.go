@@ -10,6 +10,38 @@ import (
 	"strings"
 )
 
+// Protected system paths that should never be deleted
+var protectedSystemPaths = []string{
+	// Unix/Linux
+	"/etc",
+	"/bin",
+	"/sbin",
+	"/usr",
+	"/lib",
+	"/lib64",
+	"/boot",
+	"/dev",
+	"/proc",
+	"/sys",
+	// macOS
+	"/System",
+	"/Library",
+	"/Applications",
+	// Windows
+	`C:\Windows`,
+	`C:\Program Files`,
+	`C:\Program Files (x86)`,
+	`C:\ProgramData`,
+}
+
+// Paths that are commonly used but should NOT be protected
+var allowedSubPaths = []string{
+	"/var/tmp",
+	"/var/folders",
+	"/var/log",
+	"/usr/local",
+}
+
 // sanitizePathForShell ensures a path is safe to use in shell commands.
 // It validates the path exists and escapes special characters.
 func sanitizePathForShell(path string) (string, error) {
@@ -23,19 +55,92 @@ func sanitizePathForShell(path string) (string, error) {
 		return "", fmt.Errorf("invalid path: %w", err)
 	}
 
+	// Clean the path to resolve .. and .
+	cleanPath := filepath.Clean(absPath)
+
+	// Check for path traversal attempts
+	if strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path traversal detected")
+	}
+
 	// Verify the path exists to prevent injection via non-existent paths
 	if _, err := os.Stat(absPath); err != nil {
 		return "", fmt.Errorf("path does not exist: %w", err)
 	}
 
-	// Check for dangerous patterns (but allow legitimate special chars in filenames)
-	// Block paths that try to escape the filesystem
-	cleanPath := filepath.Clean(absPath)
-	if strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("path traversal detected")
+	return absPath, nil
+}
+
+// isProtectedPath checks if a path is a protected system directory.
+// This prevents accidental deletion of critical system files.
+func isProtectedPath(path string) bool {
+	// Normalize path for comparison
+	cleanPath := filepath.Clean(path)
+	lowerPath := strings.ToLower(cleanPath)
+
+	// First check if this is an allowed subpath
+	for _, allowed := range allowedSubPaths {
+		lowerAllowed := strings.ToLower(allowed)
+		if lowerPath == lowerAllowed || strings.HasPrefix(lowerPath, lowerAllowed+string(filepath.Separator)) {
+			return false // This is an allowed subpath
+		}
 	}
 
-	return absPath, nil
+	// Check protected paths
+	for _, protected := range protectedSystemPaths {
+		lowerProtected := strings.ToLower(protected)
+		
+		// Exact match
+		if lowerPath == lowerProtected {
+			return true
+		}
+		
+		// Path is inside protected directory (direct child)
+		if strings.HasPrefix(lowerPath, lowerProtected+string(filepath.Separator)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// validateDeletePath performs comprehensive validation before deletion.
+// It checks for empty paths, path traversal, and protected system directories.
+func validateDeletePath(path string) error {
+	if path == "" {
+		return fmt.Errorf("cannot delete empty path")
+	}
+
+	// Check for root directory
+	if path == "/" || path == `\` || path == `C:\` || path == `c:\` {
+		return fmt.Errorf("cannot delete root directory")
+	}
+
+	// Check for path traversal in original path BEFORE resolving
+	// This catches attempts like "../../../etc/passwd"
+	if strings.HasPrefix(path, "..") || strings.HasPrefix(path, "../") || strings.HasPrefix(path, "..\\") {
+		return fmt.Errorf("path traversal detected")
+	}
+	
+	// Also check for /.. or \.. anywhere in the path
+	if strings.Contains(path, "/..") || strings.Contains(path, "\\..") {
+		return fmt.Errorf("path traversal detected")
+	}
+
+	// Convert to absolute path and clean
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
+	
+	cleanPath := filepath.Clean(absPath)
+
+	// Check if path is protected
+	if isProtectedPath(cleanPath) {
+		return fmt.Errorf("cannot delete protected system path: %s", path)
+	}
+
+	return nil
 }
 
 // escapeAppleScriptString escapes special characters for AppleScript strings.
@@ -127,6 +232,11 @@ $player.PlaySync()
 
 // SafeMoveToTrash moves a file to trash using OS-native commands with proper escaping.
 func SafeMoveToTrash(path string) error {
+	// Comprehensive path validation
+	if err := validateDeletePath(path); err != nil {
+		return err
+	}
+	
 	absPath, err := sanitizePathForShell(path)
 	if err != nil {
 		return err
