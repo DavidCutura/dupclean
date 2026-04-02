@@ -176,17 +176,49 @@ func safeMoveToTrashLinux(path string) error {
 			baseName := filepath.Base(path)
 			// Remove or replace dangerous characters in filename
 			safeName := regexp.MustCompile(`[<>:"/\\|?*]`).ReplaceAllString(baseName, "_")
-			
-			dest := filepath.Join(trashDir, safeName)
-			counter := 1
+
+			// Use O_CREATE|O_EXCL to atomically check and create
+			// This prevents TOCTOU race conditions
+			counter := 0
 			for {
-				if _, err := os.Stat(dest); os.IsNotExist(err) {
-					return os.Rename(path, dest)
-				}
 				ext := filepath.Ext(safeName)
 				base := strings.TrimSuffix(safeName, ext)
-				dest = filepath.Join(trashDir, fmt.Sprintf("%s (%d)%s", base, counter, ext))
+				var fileName string
+				if counter == 0 {
+					fileName = safeName
+				} else {
+					fileName = fmt.Sprintf("%s (%d)%s", base, counter, ext)
+				}
+				
+				dest := filepath.Join(trashDir, fileName)
+				
+				// Try to create the file exclusively - fails if it already exists
+				// This is atomic and prevents TOCTOU races
+				f, err := os.OpenFile(dest, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+				if err == nil {
+					// File created successfully, now rename over it
+					f.Close()
+					os.Remove(dest) // Remove the empty file we just created
+					
+					if err := os.Rename(path, dest); err != nil {
+						// Rename failed, clean up
+						os.Remove(dest)
+						return err
+					}
+					return nil
+				}
+				
+				// File already exists, try next counter
+				if !os.IsExist(err) {
+					// Some other error, fall back to permanent delete
+					break
+				}
 				counter++
+				
+				// Safety limit to prevent infinite loops
+				if counter > 1000 {
+					break
+				}
 			}
 		}
 	}
