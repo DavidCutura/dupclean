@@ -823,6 +823,7 @@ func showIgnoreDialog(state *AppState, onConfirm func()) {
 	extensionsEntry := widget.NewEntry()
 	extensionsEntry.SetPlaceHolder("e.g. .txt, .pdf, .jpg")
 	extensionsEntry.Text = strings.Join(state.IgnoreExtensions, ", ")
+	extensionsEntry.MultiLine = false
 
 	content := container.NewVBox(
 		widget.NewLabel("Folders to ignore:"),
@@ -838,22 +839,89 @@ func showIgnoreDialog(state *AppState, onConfirm func()) {
 		if !ok {
 			return
 		}
-		state.IgnoreFolders = ignoredFolders
 
+		// Validate extensions before processing
+		exts := strings.Split(extensionsEntry.Text, ",")
+		for _, ext := range exts {
+			ext = strings.TrimSpace(ext)
+			if ext == "" {
+				continue
+			}
+			if !strings.HasPrefix(ext, ".") {
+				ext = "." + ext
+			}
+			// Validate extension format
+			if !isValidExtension(ext) {
+				dialog.ShowError(
+					fmt.Errorf("invalid extension: %s. Use only letters, numbers, and dots", ext),
+					state.Window,
+				)
+				return
+			}
+		}
+
+		state.IgnoreFolders = ignoredFolders
 		state.IgnoreExtensions = []string{}
-		for _, ext := range strings.Split(extensionsEntry.Text, ",") {
+		for _, ext := range exts {
 			ext = strings.TrimSpace(ext)
 			if ext != "" {
 				if !strings.HasPrefix(ext, ".") {
 					ext = "." + ext
 				}
-				state.IgnoreExtensions = append(state.IgnoreExtensions, strings.ToLower(ext))
+				if isValidExtension(ext) {
+					state.IgnoreExtensions = append(state.IgnoreExtensions, strings.ToLower(ext))
+				}
 			}
 		}
 		if onConfirm != nil {
 			onConfirm()
 		}
 	}, state.Window)
+}
+
+// isValidExtension checks if an extension string is valid.
+// It prevents regex injection and other malicious patterns.
+func isValidExtension(ext string) bool {
+	if ext == "" {
+		return false
+	}
+
+	// Must start with a dot
+	if !strings.HasPrefix(ext, ".") {
+		return false
+	}
+
+	// Get the part after the dot
+	pattern := ext[1:]
+
+	// Empty extension after dot is invalid
+	if pattern == "" {
+		return false
+	}
+
+	// Only allow alphanumeric characters and dots
+	// This prevents regex injection patterns like .*, .+, .txt.*
+	for _, r := range pattern {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.') {
+			return false
+		}
+	}
+
+	// Prevent patterns that could match too broadly
+	// Block: *, +, ?, {, }, [, ], (, ), |, ^, $, \
+	dangerousChars := []string{"*", "+", "?", "{", "}", "[", "]", "(", ")", "|", "^", "$", "\\"}
+	for _, char := range dangerousChars {
+		if strings.Contains(ext, char) {
+			return false
+		}
+	}
+
+	// Reasonable length limit (max 20 chars including dot)
+	if len(ext) > 20 {
+		return false
+	}
+
+	return true
 }
 
 // stopPlayback stops any ongoing audio playback and waits for the goroutine to finish.
