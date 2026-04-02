@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"dupclean/cleaner"
+	"dupclean/internal/trash"
 	"dupclean/scanner"
 
 	"fyne.io/fyne/v2"
@@ -716,7 +717,7 @@ func createFinalUI(state *AppState) fyne.CanvasObject {
 }
 
 func moveToTrash(path string) error {
-	return cleaner.SafeMoveToTrash(path)
+	return trash.MoveToTrash(path)
 }
 
 func formatBytes(b int64) string {

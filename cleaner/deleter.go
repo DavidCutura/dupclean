@@ -1,9 +1,12 @@
 package cleaner
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"sync/atomic"
+
+	"dupclean/internal/trash"
 )
 
 // DeleteOptions configures how deletion is performed.
@@ -119,15 +122,17 @@ type deleteResult struct {
 
 // deleteEntry deletes a single entry.
 func deleteEntry(entry EntryInfo, permanent bool) (deleted int, freedBytes int64, skipped bool, err error) {
-	// Comprehensive path validation
-	if err := validateDeletePath(entry.Path); err != nil {
-		return 0, 0, false, err
+	// Path validation for all operations
+	if entry.Path == "" {
+		return 0, 0, false, fmt.Errorf("cannot delete empty path")
+	}
+	if entry.Path == "/" || entry.Path == `\` {
+		return 0, 0, false, fmt.Errorf("cannot delete root directory")
 	}
 
-	if permanent {
-		// Permanent deletion
-		err = os.RemoveAll(entry.Path)
-		if err != nil {
+	if !permanent {
+		// For trash operations, use the unified trash package which has built-in validation
+		if err := trash.MoveToTrash(entry.Path); err != nil {
 			// Check if file is in use
 			if isFileInUse(err) {
 				return 0, 0, true, nil // skipped, not an error
@@ -137,16 +142,15 @@ func deleteEntry(entry EntryInfo, permanent bool) (deleted int, freedBytes int64
 		return 1, entry.Size, false, nil
 	}
 
-	// Move to trash using existing utility
-	err = moveToTrash(entry.Path)
+	// Permanent deletion
+	err = os.RemoveAll(entry.Path)
 	if err != nil {
 		// Check if file is in use
 		if isFileInUse(err) {
-			return 0, 0, true, nil // skipped
+			return 0, 0, true, nil // skipped, not an error
 		}
 		return 0, 0, false, err
 	}
-
 	return 1, entry.Size, false, nil
 }
 
@@ -190,5 +194,5 @@ func findSubstring(s, substr string) bool {
 
 // moveToTrash moves a file or directory to the trash/recycle bin.
 func moveToTrash(path string) error {
-	return SafeMoveToTrash(path)
+	return trash.MoveToTrash(path)
 }
